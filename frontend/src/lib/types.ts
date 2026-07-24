@@ -44,6 +44,10 @@ export interface WorkflowNodeConfig {
   fileChecks?: string[];
   objective?: string;
   constraints?: string;
+  targetRepo?: string;
+  mainTargetFile?: string;
+  targetFiles?: string[];
+  validateCommand?: string;
 }
 
 export interface WorkflowNode {
@@ -102,10 +106,11 @@ export interface NodeExecutionReceipt {
 
 export interface PendingHumanGate {
   nodeId: string;
-  kind: "criteria" | "final";
+  kind: "criteria" | "final" | "extra_files";
   title: string;
   summary: string;
   editableText?: string;
+  extraFiles?: string[];
 }
 
 export interface RunRecord {
@@ -122,6 +127,11 @@ export interface RunRecord {
   pendingGate?: PendingHumanGate;
   objective: string;
   constraints: string;
+  targetRepo: string;
+  mainTargetFile: string;
+  targetFiles: string[];
+  approvedExtraFiles?: string[];
+  validateCommand: string;
   criteria: string[];
   plan: string;
   validationEvidence?: string;
@@ -135,4 +145,5 @@ export interface RunRecord {
 export interface HumanGateDecision {
   action: "approve" | "reject" | "edit";
   editedText?: string;
+  feedback?: string;
 }

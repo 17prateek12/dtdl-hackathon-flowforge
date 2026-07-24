@@ -108,12 +108,30 @@ TOOL_DEFS = [
 ]
 
 
+def _scope_note(
+    main_target_file: Optional[str] = None,
+    target_repo: Optional[str] = None,
+) -> str:
+    parts: list[str] = []
+    if target_repo:
+        parts.append(f"Target codebase: {target_repo}")
+    if main_target_file:
+        parts.append(
+            f"Primary file to modify: {main_target_file}. "
+            "You may change other files if needed (e.g. tests or imports), but "
+            "changes outside the primary file require human approval before the run continues."
+        )
+    return "\n".join(parts)
+
+
 def generate_success_criteria(
     *,
     objective: str,
     constraints: str,
     instructions: Optional[str] = None,
     model: Optional[str] = None,
+    main_target_file: Optional[str] = None,
+    target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
     if use_mock():
         criteria = [
@@ -130,7 +148,10 @@ def generate_success_criteria(
         model=model,
         system=instructions
         or "Convert the engineering objective into measurable success criteria. Return JSON { criteria: string[] }.",
-        user=f"Objective:\n{objective}\n\nConstraints:\n{constraints}",
+        user=(
+            f"Objective:\n{objective}\n\nConstraints:\n{constraints}\n\n"
+            f"{_scope_note(main_target_file, target_repo)}"
+        ),
         json_mode=True,
     )
     parsed = json.loads(text or "{}")
@@ -147,9 +168,15 @@ def generate_plan(
     feedback: Optional[str] = None,
     instructions: Optional[str] = None,
     model: Optional[str] = None,
+    main_target_file: Optional[str] = None,
+    target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
     listing = ", ".join(repo_tools.list_dir("."))
-    app_src = repo_tools.read_file("src/app.js")
+    sample_path = main_target_file or "src/app.js"
+    try:
+        sample_src = repo_tools.read_file(sample_path)
+    except Exception:  # noqa: BLE001
+        sample_src = "(file not readable)"
 
     if use_mock():
         steps = [
@@ -181,7 +208,9 @@ def generate_plan(
                 "criteria": criteria,
                 "feedback": feedback,
                 "repoListing": listing,
-                "appJs": app_src,
+                "sampleFile": sample_path,
+                "sampleSource": sample_src,
+                "scope": _scope_note(main_target_file, target_repo),
             }
         ),
         json_mode=True,
@@ -207,6 +236,8 @@ def execute_changes(
     instructions: Optional[str] = None,
     model: Optional[str] = None,
     force_fail: bool = False,
+    main_target_file: Optional[str] = None,
+    target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
     if use_mock():
         transcript = [
@@ -252,19 +283,22 @@ def execute_changes(
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"
 
+    scope = _scope_note(main_target_file, target_repo)
     transcript, _ = chat_with_tools(
         model=model,
         system=(
-            instructions
-            or "Implement the planned changes using tools. Stay inside demo-repo."
-        )
-        + " Prefer editing src/app.js. Stop when the plan is implemented.",
+            (instructions or "Implement the planned changes using tools.")
+            + " "
+            + scope
+            + " Stop when the plan is implemented."
+        ),
         user=json.dumps(
             {
                 "objective": objective,
                 "plan": plan,
                 "criteria": criteria,
                 "feedback": feedback,
+                "mainTargetFile": main_target_file or "",
             }
         ),
         tools=TOOL_DEFS,

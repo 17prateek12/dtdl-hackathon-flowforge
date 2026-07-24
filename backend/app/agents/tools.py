@@ -4,17 +4,15 @@ import subprocess
 from pathlib import Path
 
 from app.models import FileChange
-from app.paths import DEMO_REPO_DIR
+from app.agents.workspace import get_workspace, normalize_rel_path
+
+
+def _root() -> Path:
+    return get_workspace().root
 
 
 def _resolve_safe(rel_path: str) -> Path:
-    cleaned = rel_path.lstrip("/").replace("\\", "/")
-    if ".." in cleaned.split("/"):
-        raise ValueError("Path traversal is not allowed")
-    full = (DEMO_REPO_DIR / cleaned).resolve()
-    if not str(full).startswith(str(DEMO_REPO_DIR.resolve())):
-        raise ValueError("Path escapes demo-repo sandbox")
-    return full
+    return get_workspace().resolve(rel_path)
 
 
 def list_dir(rel_path: str = ".") -> list[str]:
@@ -30,7 +28,8 @@ def read_file(rel_path: str) -> str:
 
 
 def write_file(rel_path: str, content: str) -> FileChange:
-    full = _resolve_safe(rel_path)
+    ws = get_workspace()
+    full = ws.resolve(rel_path)
     action: str = "created"
     before = ""
     if full.exists():
@@ -42,7 +41,7 @@ def write_file(rel_path: str, content: str) -> FileChange:
     before_lines = len(before.splitlines()) if before else 0
     after_lines = len(content.splitlines())
     return FileChange(
-        path=rel_path,
+        path=normalize_rel_path(rel_path),
         action=action,  # type: ignore[arg-type]
         linesAdded=max(0, after_lines - before_lines),
         linesRemoved=max(0, before_lines - after_lines),
@@ -55,17 +54,20 @@ def search_repo(query: str, rel_path: str = ".") -> list[str]:
 
     def walk(directory: Path, prefix: str) -> None:
         for entry in directory.iterdir():
-            if entry.name in {"node_modules", ".git"}:
+            if entry.name in {"node_modules", ".git", ".venv", "__pycache__"}:
                 continue
             rel = f"{prefix}/{entry.name}" if prefix else entry.name
             if entry.is_dir():
                 walk(entry, rel)
             else:
-                text = entry.read_text(encoding="utf-8", errors="ignore")
+                try:
+                    text = entry.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
                 if query in text or query in entry.name:
                     hits.append(rel)
 
-    walk(root, "" if rel_path == "." else rel_path)
+    walk(root, "" if rel_path == "." else normalize_rel_path(rel_path))
     return hits
 
 
@@ -74,7 +76,7 @@ def run_shell(command: str, timeout_sec: int = 120) -> dict:
         completed = subprocess.run(
             command,
             shell=True,
-            cwd=str(DEMO_REPO_DIR),
+            cwd=str(_root()),
             capture_output=True,
             text=True,
             timeout=timeout_sec,
@@ -92,19 +94,19 @@ def run_shell(command: str, timeout_sec: int = 120) -> dict:
         }
 
 
-def ensure_demo_git() -> None:
-    git_dir = DEMO_REPO_DIR / ".git"
+def ensure_git() -> None:
+    git_dir = _root() / ".git"
     if git_dir.exists():
         return
     run_shell("git init")
     run_shell('git config user.email "loopforge@local"')
     run_shell('git config user.name "LoopForge"')
     run_shell("git add -A")
-    run_shell('git commit -m "baseline: demo API without /health" --allow-empty')
+    run_shell('git commit -m "loopforge-baseline" --allow-empty')
 
 
 def git_snapshot() -> str:
-    ensure_demo_git()
+    ensure_git()
     run_shell("git add -A")
     status = run_shell("git status --porcelain")
     if status["stdout"].strip():
@@ -114,13 +116,13 @@ def git_snapshot() -> str:
 
 
 def git_rollback() -> None:
-    ensure_demo_git()
+    ensure_git()
     run_shell("git checkout -- .")
     run_shell("git clean -fd")
 
 
 def git_diff_stat() -> list[FileChange]:
-    ensure_demo_git()
+    ensure_git()
     status = run_shell("git status --porcelain")
     changes: list[FileChange] = []
     for line in status["stdout"].splitlines():
@@ -135,3 +137,21 @@ def git_diff_stat() -> list[FileChange]:
             action = "deleted"
         changes.append(FileChange(path=file_path, action=action))  # type: ignore[arg-type]
     return changes
+
+
+def revert_files(rel_paths: list[str]) -> None:
+    ensure_git()
+    for rel in rel_paths:
+        status = run_shell(f'git status --porcelain -- "{rel}"')
+        line = status["stdout"].strip()
+        if not line:
+            continue
+        code = line[:2]
+        if "?" in code or code.strip() == "A":
+            run_shell(f'git clean -fd -- "{rel}"')
+        else:
+            run_shell(f'git checkout -- "{rel}"')
+
+
+def list_extra_file_changes(changed_paths: list[str]) -> list[str]:
+    return get_workspace().extra_files_changed(changed_paths)
