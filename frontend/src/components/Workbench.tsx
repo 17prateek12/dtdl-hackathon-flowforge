@@ -2,14 +2,18 @@
 
 import {
   Background,
+  BackgroundVariant,
   Controls,
-  MiniMap,
+  MarkerType,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
   addEdge,
-  type Edge,
   type Connection,
+  type Edge,
+  type EdgeChange,
+  type NodeChange,
+  type OnSelectionChangeParams,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -26,11 +30,34 @@ import type { RunRecord, Workflow, WorkflowNode, NodeType } from "@/lib/types";
 const nodeTypes = { loopNode: LoopNode };
 
 const FIT_VIEW_OPTIONS = {
-  padding: 0.22,
+  padding: 0.26,
   duration: 280,
-  maxZoom: 0.92,
-  minZoom: 0.12,
+  maxZoom: 0.85,
+  minZoom: 0.3,
 } as const;
+
+/** Manual zoom range — fit starts ~0.32–0.45; “−” can go a bit lower. */
+const CANVAS_MIN_ZOOM = 0.28;
+const CANVAS_MAX_ZOOM = 1.4;
+
+/**
+ * Z-flow layout — top L→R, middle L→R, bottom R→L.
+ * Wide column spacing (~420px) keeps wires from stacking on nodes.
+ */
+const DEFAULT_NODE_LAYOUT: Record<string, { x: number; y: number }> = {
+  input: { x: 80, y: 400 },
+  criteria: { x: 460, y: 100 },
+  "gate-criteria": { x: 840, y: 100 },
+  stop: { x: 1280, y: 100 },
+  planning: { x: 460, y: 400 },
+  "gate-plan": { x: 840, y: 400 },
+  execution: { x: 1200, y: 400 },
+  command: { x: 1520, y: 400 },
+  validation: { x: 1520, y: 700 },
+  decision: { x: 1200, y: 700 },
+  "gate-final": { x: 840, y: 700 },
+  success: { x: 460, y: 700 },
+};
 
 const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
   id: "default",
@@ -40,7 +67,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "input",
       type: "loopNode",
-      position: { x: 40, y: 180 },
+      position: DEFAULT_NODE_LAYOUT.input,
       data: {
         label: "Coding Objective",
         description: "Objective and constraints",
@@ -52,7 +79,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "criteria",
       type: "loopNode",
-      position: { x: 280, y: 80 },
+      position: DEFAULT_NODE_LAYOUT.criteria,
       data: {
         label: "Success Criteria Agent",
         description: "Generate measurable success criteria",
@@ -69,7 +96,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "gate-criteria",
       type: "loopNode",
-      position: { x: 540, y: 80 },
+      position: DEFAULT_NODE_LAYOUT["gate-criteria"],
       data: {
         label: "Human Gate (Review)",
         description: "Review and approve success criteria",
@@ -79,7 +106,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "planning",
       type: "loopNode",
-      position: { x: 280, y: 280 },
+      position: DEFAULT_NODE_LAYOUT.planning,
       data: {
         label: "Planning Agent",
         description: "Create / revise implementation plan",
@@ -94,9 +121,19 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
       },
     },
     {
+      id: "gate-plan",
+      type: "loopNode",
+      position: DEFAULT_NODE_LAYOUT["gate-plan"],
+      data: {
+        label: "Review & Approve Plan",
+        description: "Approve architecture and steps",
+        nodeType: "humanGate",
+      },
+    },
+    {
       id: "execution",
       type: "loopNode",
-      position: { x: 540, y: 280 },
+      position: DEFAULT_NODE_LAYOUT.execution,
       data: {
         label: "Execution Agent",
         description: "Implement changes in the codebase",
@@ -113,7 +150,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "command",
       type: "loopNode",
-      position: { x: 800, y: 280 },
+      position: DEFAULT_NODE_LAYOUT.command,
       data: {
         label: "Run Tests",
         description: "npm test",
@@ -125,7 +162,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "validation",
       type: "loopNode",
-      position: { x: 1060, y: 280 },
+      position: DEFAULT_NODE_LAYOUT.validation,
       data: {
         label: "Validation Agent",
         description: "Validate changes and provide evidence",
@@ -142,7 +179,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "decision",
       type: "loopNode",
-      position: { x: 1320, y: 280 },
+      position: DEFAULT_NODE_LAYOUT.decision,
       data: {
         label: "Decision",
         description: "Pass / Fail?",
@@ -152,7 +189,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "gate-final",
       type: "loopNode",
-      position: { x: 1320, y: 80 },
+      position: DEFAULT_NODE_LAYOUT["gate-final"],
       data: {
         label: "Human Gate (Approve)",
         description: "Approve completion",
@@ -162,7 +199,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "success",
       type: "loopNode",
-      position: { x: 1580, y: 40 },
+      position: DEFAULT_NODE_LAYOUT.success,
       data: {
         label: "Success",
         description: "Task Successful",
@@ -172,7 +209,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     {
       id: "stop",
       type: "loopNode",
-      position: { x: 1580, y: 200 },
+      position: DEFAULT_NODE_LAYOUT.stop,
       data: {
         label: "Stop",
         description: "Stopped Safely",
@@ -202,7 +239,16 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
       label: "reject",
       style: { stroke: "#ef4444", strokeDasharray: "6 4" },
     },
-    { id: "e-planning-exec", source: "planning", target: "execution" },
+    { id: "e-planning-gate-plan", source: "planning", target: "gate-plan", sourceHandle: "success" },
+    { id: "e-gate-plan-exec", source: "gate-plan", target: "execution", sourceHandle: "approve" },
+    {
+      id: "e-gate-plan-stop",
+      source: "gate-plan",
+      target: "stop",
+      sourceHandle: "reject",
+      label: "reject",
+      style: { stroke: "#ef4444", strokeDasharray: "6 4" },
+    },
     { id: "e-exec-cmd", source: "execution", target: "command" },
     { id: "e-cmd-val", source: "command", target: "validation" },
     { id: "e-val-decision", source: "validation", target: "decision" },
@@ -258,6 +304,34 @@ function statusLabel(status: RunRecord["status"] | "idle") {
   }
 }
 
+function StatusPill({ status }: { status: RunRecord["status"] | "idle" }) {
+  const styles: Record<string, string> = {
+    idle: "bg-slate-100 text-slate-600",
+    running: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
+    waiting_for_human: "bg-amber-50 text-amber-800 ring-1 ring-amber-100",
+    succeeded: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+    stopped: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+    failed: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+  };
+  const dots: Record<string, string> = {
+    idle: "bg-slate-400",
+    running: "bg-sky-500 animate-pulse",
+    waiting_for_human: "bg-amber-500 animate-pulse",
+    succeeded: "bg-emerald-500",
+    stopped: "bg-rose-500",
+    failed: "bg-rose-500",
+  };
+
+  return (
+    <span
+      className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:inline-flex ${styles[status] ?? styles.idle}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dots[status] ?? dots.idle}`} />
+      {statusLabel(status)}
+    </span>
+  );
+}
+
 export function Workbench() {
   return (
     <ReactFlowProvider>
@@ -270,6 +344,7 @@ function WorkbenchInner() {
   const reactFlow = useReactFlow();
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>("criteria");
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [consoleCollapsed, setConsoleCollapsed] = useState(true);
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
@@ -327,21 +402,40 @@ function WorkbenchInner() {
       id: n.id,
       type: "loopNode" as const,
       position: n.position,
+      selected: n.id === selectedId,
+      selectable: true,
+      deletable: true,
       data: {
         ...n.data,
         status: run?.nodeStatuses[n.id] || "idle",
       },
     }));
-  }, [workflow, run]);
+  }, [workflow, run, selectedId]);
 
   const edges: Edge[] = useMemo(() => {
     const baseEdges = workflow?.edges ?? [];
     const isRunning = run?.status === "running" || run?.status === "waiting_for_human";
     return baseEdges.map((edge) => ({
       ...edge,
+      type: edge.type ?? "smoothstep",
+      selected: edge.id === selectedEdgeId,
+      selectable: true,
+      deletable: true,
       animated: isRunning ? true : edge.animated,
+      style: { strokeWidth: 2, ...edge.style },
+      labelStyle: {
+        fill: "#475569",
+        fontSize: 10,
+        fontWeight: 600,
+      },
+      labelBgStyle: {
+        fill: "#ffffff",
+        fillOpacity: 0.92,
+      },
+      labelBgPadding: [6, 4] as [number, number],
+      labelBgBorderRadius: 4,
     }));
-  }, [workflow, run]);
+  }, [workflow, run, selectedEdgeId]);
 
   const selectedNode: WorkflowNode | null = useMemo(() => {
     if (!workflow?.nodes || !selectedId) return null;
@@ -362,7 +456,7 @@ function WorkbenchInner() {
   }, [fitCanvasToNodes, workflow?.id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(fitCanvasToNodes, 240);
+    const timer = window.setTimeout(fitCanvasToNodes, 320);
     return () => window.clearTimeout(timer);
   }, [fitCanvasToNodes, leftSidebarCollapsed, rightSidebarCollapsed, consoleCollapsed]);
 
@@ -371,6 +465,101 @@ function WorkbenchInner() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [fitCanvasToNodes]);
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    const removedIds = changes
+      .filter((change) => change.type === "remove")
+      .map((change) => change.id);
+
+    if (removedIds.length > 0) {
+      setSelectedId((id) => (id && removedIds.includes(id) ? null : id));
+    }
+
+    setWorkflow((prev) => {
+      if (!prev?.nodes?.length) return prev;
+
+      const positionChanges = new Map<string, { x: number; y: number }>();
+      for (const change of changes) {
+        if (change.type === "position" && change.position) {
+          positionChanges.set(change.id, change.position);
+        }
+      }
+
+      if (removedIds.length === 0 && positionChanges.size === 0) return prev;
+
+      let nextNodes = prev.nodes;
+      if (positionChanges.size > 0) {
+        nextNodes = nextNodes.map((node) => {
+          const position = positionChanges.get(node.id);
+          return position ? { ...node, position } : node;
+        });
+      }
+      if (removedIds.length > 0) {
+        nextNodes = nextNodes.filter((node) => !removedIds.includes(node.id));
+      }
+
+      let nextEdges = prev.edges ?? [];
+      if (removedIds.length > 0) {
+        nextEdges = nextEdges.filter(
+          (edge) =>
+            !removedIds.includes(edge.source) && !removedIds.includes(edge.target),
+        );
+      }
+
+      return { ...prev, nodes: nextNodes, edges: nextEdges };
+    });
+  }, []);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    const removedIds = changes
+      .filter((change) => change.type === "remove")
+      .map((change) => change.id);
+    if (removedIds.length === 0) return;
+
+    setSelectedEdgeId((id) => (id && removedIds.includes(id) ? null : id));
+
+    setWorkflow((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        edges: (prev.edges ?? []).filter((edge) => !removedIds.includes(edge.id)),
+      };
+    });
+  }, []);
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selNodes, edges: selEdges }: OnSelectionChangeParams) => {
+      setSelectedId(selNodes[0]?.id ?? null);
+      setSelectedEdgeId(selEdges[0]?.id ?? null);
+    },
+    [],
+  );
+
+  const deleteSelected = useCallback(() => {
+    if (selectedEdgeId) {
+      setWorkflow((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          edges: (prev.edges ?? []).filter((e) => e.id !== selectedEdgeId),
+        };
+      });
+      setSelectedEdgeId(null);
+      return;
+    }
+    if (!selectedId) return;
+    setWorkflow((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        nodes: (prev.nodes ?? []).filter((n) => n.id !== selectedId),
+        edges: (prev.edges ?? []).filter(
+          (e) => e.source !== selectedId && e.target !== selectedId,
+        ),
+      };
+    });
+    setSelectedId(null);
+  }, [selectedEdgeId, selectedId]);
 
   const onNodeChange = useCallback(
     (nodeId: string, patch: Partial<WorkflowNode["data"]>) => {
@@ -389,18 +578,29 @@ function WorkbenchInner() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!connection.source || !connection.target) return;
       setWorkflow((prev) => {
         if (!prev) return prev;
+        const handleSuffix = connection.sourceHandle
+          ? `-${connection.sourceHandle}`
+          : "";
         const newEdge = {
-          id: `${connection.source}-${connection.target}`,
-          source: connection.source || "",
-          target: connection.target || "",
+          id: `${connection.source}${handleSuffix}-${connection.target}`,
+          source: connection.source,
+          target: connection.target,
           sourceHandle: connection.sourceHandle,
           targetHandle: connection.targetHandle,
           label: undefined,
           style: undefined,
           animated: undefined,
         };
+        const exists = (prev.edges ?? []).some(
+          (e) =>
+            e.source === newEdge.source &&
+            e.target === newEdge.target &&
+            (e.sourceHandle ?? null) === (newEdge.sourceHandle ?? null),
+        );
+        if (exists) return prev;
         return {
           ...prev,
           edges: addEdge(newEdge, prev.edges ?? []),
@@ -604,9 +804,9 @@ function WorkbenchInner() {
 
   return (
     <div className="flex h-screen flex-col bg-[#f4f6fb] text-slate-900">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 shadow-sm shadow-slate-200/50 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-sm shadow-indigo-200/80">
             LF
           </div>
           <div>
@@ -622,15 +822,17 @@ function WorkbenchInner() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="mr-2 hidden text-xs text-slate-500 sm:inline">
-            {statusLabel(runStatus)}
-            {run ? ` · Attempt ${run.attempt}/${run.maxAttempts}` : ""}
-          </span>
+          <StatusPill status={runStatus} />
+          {run ? (
+            <span className="mr-1 hidden text-[11px] text-slate-400 sm:inline">
+              Attempt {run.attempt}/{run.maxAttempts}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => setLeftSidebarCollapsed((v) => !v)}
             title={leftSidebarCollapsed ? "Show library" : "Hide library"}
-            className="hidden rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:inline"
+            className="hidden rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 sm:inline"
           >
             {leftSidebarCollapsed ? "◧ Library" : "◨ Library"}
           </button>
@@ -638,15 +840,24 @@ function WorkbenchInner() {
             type="button"
             onClick={() => setRightSidebarCollapsed((v) => !v)}
             title={rightSidebarCollapsed ? "Show inspector" : "Hide inspector"}
-            className="hidden rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:inline"
+            className="hidden rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 sm:inline"
           >
             {rightSidebarCollapsed ? "Inspector ◧" : "Inspector ◨"}
           </button>
           <button
             type="button"
+            onClick={deleteSelected}
+            disabled={!selectedId && !selectedEdgeId}
+            title="Delete selected node or connection (Delete key)"
+            className="rounded-lg border border-rose-200/80 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-100 disabled:opacity-40"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
             onClick={() => void saveWorkflow()}
             disabled={busy || !workflow}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50"
           >
             Save
           </button>
@@ -655,14 +866,14 @@ function WorkbenchInner() {
             onClick={() => void resetWorkflow()}
             disabled={busy || !workflow}
             title="Restore this workflow to the default template, discarding node edits"
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 shadow-sm hover:bg-slate-50 disabled:opacity-50"
           >
             Reset
           </button>
           <button
             type="button"
             onClick={exportYaml}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+            className="rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-slate-50"
           >
             Export YAML
           </button>
@@ -675,7 +886,7 @@ function WorkbenchInner() {
               runStatus === "running" ||
               runStatus === "waiting_for_human"
             }
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm shadow-emerald-200/80 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50"
           >
             Run
           </button>
@@ -708,7 +919,7 @@ function WorkbenchInner() {
           onToggleCollapse={() => setLeftSidebarCollapsed((v) => !v)}
         />
         <div
-          className="relative h-full min-h-0 min-w-0 flex-1"
+          className="relative h-full min-h-0 min-w-0 flex-1 bg-gradient-to-br from-slate-50 via-[#f4f6fb] to-indigo-50/40"
           onDragOver={onDragOver}
           onDrop={onDrop}
         >
@@ -716,18 +927,40 @@ function WorkbenchInner() {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
-            fitView
             fitViewOptions={FIT_VIEW_OPTIONS}
+            minZoom={CANVAS_MIN_ZOOM}
+            maxZoom={CANVAS_MAX_ZOOM}
+            zoomOnScroll
+            zoomOnPinch
+            defaultEdgeOptions={{
+              type: "smoothstep",
+              style: { stroke: "#94a3b8", strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: "#94a3b8",
+                width: 18,
+                height: 18,
+              },
+            }}
             className="!h-full !w-full"
             nodesDraggable
             nodesConnectable
             elementsSelectable
-            onNodeClick={(_, node) => setSelectedId(node.id)}
+            deleteKeyCode={["Backspace", "Delete"]}
+            edgesFocusable
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onSelectionChange={onSelectionChange}
             onConnect={onConnect}
             proOptions={{ hideAttribution: true }}
           >
-            <Background gap={18} size={1} color="#e2e8f0" />
-            <Controls />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1.25}
+              color="#cbd5e1"
+            />
+            <Controls showInteractive={false} position="bottom-left" />
           </ReactFlow>
         </div>
         <NodeInspector

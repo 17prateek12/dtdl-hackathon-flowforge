@@ -2,6 +2,9 @@
 
 import type { WorkflowNode } from "@/lib/types";
 
+const inputClassName =
+  "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm shadow-sm transition-shadow focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+
 export interface ModelOption {
   id: string;
   label: string;
@@ -60,7 +63,7 @@ export function NodeInspector({
 
   if (!node) {
     return (
-      <aside className="relative flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white transition-[width] duration-200">
+      <aside className="relative flex w-72 shrink-0 flex-col border-l border-slate-200/80 bg-gradient-to-b from-white to-slate-50/80 transition-[width] duration-200">
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -72,7 +75,14 @@ export function NodeInspector({
         <div className="border-b border-slate-200 px-3 py-2.5 pl-10 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Node Inspector
         </div>
-        <div className="p-4 text-sm text-slate-400">Select a node to inspect</div>
+        <div className="p-6 text-center text-sm text-slate-400">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+          </div>
+          Select a node to inspect
+        </div>
       </aside>
     );
   }
@@ -101,7 +111,7 @@ export function NodeInspector({
       <div className="flex-1 space-y-3 overflow-auto p-3 text-sm">
         <Field label="Name">
           <input
-            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+            className={inputClassName}
             value={d.label}
             onChange={(e) => onChange(node.id, { label: e.target.value })}
           />
@@ -111,14 +121,14 @@ export function NodeInspector({
           <>
             <Field label="Objective">
               <textarea
-                className="min-h-[88px] w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                className={`min-h-[88px] ${inputClassName}`}
                 value={d.objective || ""}
                 onChange={(e) => onChange(node.id, { objective: e.target.value })}
               />
             </Field>
             <Field label="Constraints">
               <textarea
-                className="min-h-[72px] w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                className={`min-h-[72px] ${inputClassName}`}
                 value={d.constraints || ""}
                 onChange={(e) =>
                   onChange(node.id, { constraints: e.target.value })
@@ -127,7 +137,7 @@ export function NodeInspector({
             </Field>
             <Field label="Target codebase path">
               <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
+                className={`${inputClassName} font-mono`}
                 placeholder="demo-repo or /absolute/path/to/your/project"
                 value={d.targetRepo || ""}
                 onChange={(e) =>
@@ -140,7 +150,7 @@ export function NodeInspector({
             </Field>
             <Field label="Main target file">
               <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
+                className={`${inputClassName} font-mono`}
                 placeholder="src/app.js"
                 value={d.mainTargetFile || d.targetFiles?.[0] || ""}
                 onChange={(e) =>
@@ -159,7 +169,7 @@ export function NodeInspector({
             </Field>
             <Field label="Validate command">
               <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
+                className={`${inputClassName} font-mono`}
                 placeholder="npm test"
                 value={d.validateCommand || ""}
                 onChange={(e) =>
@@ -174,7 +184,7 @@ export function NodeInspector({
           <>
             <Field label="Instructions">
               <textarea
-                className="min-h-[96px] w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                className={`min-h-[96px] ${inputClassName}`}
                 value={d.instructions || ""}
                 onChange={(e) =>
                   onChange(node.id, { instructions: e.target.value })
@@ -184,7 +194,7 @@ export function NodeInspector({
             <Field label="Model">
               {models && models.length > 0 ? (
                 <select
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm bg-white"
+                  className={`${inputClassName} bg-white`}
                   value={d.model || ""}
                   onChange={(e) => onChange(node.id, { model: e.target.value })}
                 >
@@ -197,7 +207,7 @@ export function NodeInspector({
                 </select>
               ) : (
                 <input
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className={inputClassName}
                   value={d.model || ""}
                   onChange={(e) => onChange(node.id, { model: e.target.value })}
                 />
@@ -209,7 +219,7 @@ export function NodeInspector({
                   {d.tools.map((t) => (
                     <span
                       key={t}
-                      className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700"
+                      className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-indigo-100"
                     >
                       {t}
                     </span>
@@ -221,7 +231,7 @@ export function NodeInspector({
               <Field label="Max retries">
                 <input
                   type="number"
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className={inputClassName}
                   value={d.maxRetries ?? 2}
                   onChange={(e) =>
                     onChange(node.id, { maxRetries: Number(e.target.value) })
@@ -231,7 +241,7 @@ export function NodeInspector({
               <Field label="Timeout (s)">
                 <input
                   type="number"
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className={inputClassName}
                   value={d.timeout ?? 300}
                   onChange={(e) =>
                     onChange(node.id, { timeout: Number(e.target.value) })
@@ -245,7 +255,7 @@ export function NodeInspector({
         {showCommand && (
           <Field label="Command">
             <input
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
+              className={`${inputClassName} font-mono`}
               value={d.command || ""}
               onChange={(e) => onChange(node.id, { command: e.target.value })}
             />
@@ -260,7 +270,7 @@ export function NodeInspector({
           </Field>
         )}
 
-        <div className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-500">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 text-[11px] text-slate-500 shadow-sm">
           Type: <span className="font-medium text-slate-700">{d.nodeType}</span>
           {d.role ? (
             <>
@@ -283,10 +293,11 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         {label}
       </div>
       {children}
     </label>
   );
 }
+

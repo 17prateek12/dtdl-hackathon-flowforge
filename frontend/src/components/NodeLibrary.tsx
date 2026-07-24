@@ -3,14 +3,14 @@
 import { useState } from "react";
 
 const LIBRARY = [
-  { type: "input", label: "Input", hint: "Objective & constraints" },
-  { type: "agent", label: "Agent", hint: "Criteria / plan / execute" },
-  { type: "command", label: "Command", hint: "Build, test, shell" },
-  { type: "validator", label: "Validator", hint: "Deterministic checks" },
-  { type: "decision", label: "Decision", hint: "Pass / fail routing" },
-  { type: "humanGate", label: "Human Gate", hint: "Approval pause" },
-  { type: "success", label: "Success", hint: "Task successful" },
-  { type: "stop", label: "Stop", hint: "Stopped safely" },
+  { type: "input", label: "Input", hint: "Objective & constraints", stripe: "border-l-sky-400", dot: "bg-sky-400" },
+  { type: "agent", label: "Agent", hint: "Criteria / plan / execute", stripe: "border-l-indigo-400", dot: "bg-indigo-400" },
+  { type: "command", label: "Command", hint: "Build, test, shell", stripe: "border-l-amber-400", dot: "bg-amber-400" },
+  { type: "validator", label: "Validator", hint: "Deterministic checks", stripe: "border-l-violet-400", dot: "bg-violet-400" },
+  { type: "decision", label: "Decision", hint: "Pass / fail routing", stripe: "border-l-fuchsia-400", dot: "bg-fuchsia-400" },
+  { type: "humanGate", label: "Human Gate", hint: "Approval pause", stripe: "border-l-orange-400", dot: "bg-orange-400" },
+  { type: "success", label: "Success", hint: "Task successful", stripe: "border-l-emerald-400", dot: "bg-emerald-400" },
+  { type: "stop", label: "Stop", hint: "Stopped safely", stripe: "border-l-rose-400", dot: "bg-rose-400" },
 ];
 
 interface Props {
@@ -110,7 +110,7 @@ export function NodeLibrary({
 
   return (
     <>
-      <aside className="relative flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 overflow-y-auto transition-[width] duration-200">
+      <aside className="relative flex w-64 shrink-0 flex-col border-r border-slate-200/80 bg-gradient-to-b from-slate-50 to-white overflow-y-auto transition-[width] duration-200">
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -127,16 +127,19 @@ export function NodeLibrary({
             Drag nodes to canvas
           </p>
         </div>
-        <div className="space-y-1 p-2">
+        <div className="space-y-1.5 p-2">
           {LIBRARY.map((item) => (
             <div
               key={item.type}
               draggable
               onDragStart={(e) => handleDragStart(e, item)}
-              className="cursor-move rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:bg-slate-100 active:opacity-75"
+              className={`cursor-move rounded-lg border border-slate-200/80 border-l-[3px] ${item.stripe} bg-white px-2.5 py-2 shadow-sm transition-all hover:-translate-y-px hover:border-slate-300 hover:shadow-md active:scale-[0.99]`}
             >
-              <div className="text-xs font-medium text-slate-800">{item.label}</div>
-              <div className="text-[10px] text-slate-500 leading-tight">{item.hint}</div>
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${item.dot}`} />
+                <div className="text-xs font-medium text-slate-800">{item.label}</div>
+              </div>
+              <div className="mt-0.5 pl-4 text-[10px] leading-tight text-slate-500">{item.hint}</div>
             </div>
           ))}
         </div>
@@ -150,7 +153,7 @@ export function NodeLibrary({
             placeholder="Absolute folder path (e.g. C:/my-repo)"
             value={repoPath}
             onChange={(e) => setRepoPath(e.target.value)}
-            className="w-full rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-700 bg-white shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 shadow-sm transition-shadow focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
@@ -161,7 +164,7 @@ export function NodeLibrary({
           <button
             type="button"
             onClick={() => onLoadTemplate?.()}
-            className="mt-2 w-full rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 active:opacity-75"
+            className="mt-2 w-full rounded-lg border border-dashed border-indigo-200 bg-indigo-50/50 px-2.5 py-2 text-[11px] font-medium text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 active:opacity-75"
           >
             Default four-agent coding loop
           </button>
@@ -175,7 +178,7 @@ export function NodeLibrary({
             type="button"
             onClick={handleReview}
             disabled={reviewing}
-            className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-3 text-[11px] disabled:opacity-50 transition-colors"
+            className="mt-2 w-full rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 py-1.5 px-3 text-[11px] font-medium text-white shadow-sm shadow-indigo-200/60 transition-all hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50"
           >
             {reviewing ? "Auditing codebase..." : "📊 Run Architectural Audit"}
           </button>

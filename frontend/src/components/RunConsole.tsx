@@ -64,7 +64,7 @@ export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) 
       <style>{scrollbarHideStyles}</style>
       <section
       ref={sectionRef}
-      className="border-t border-slate-200 bg-slate-950 text-slate-100 overflow-hidden flex flex-col select-none"
+      className="overflow-hidden flex flex-col select-none border-t border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-100"
       style={{
         height: `${displayHeight}px`,
         transition: isDragging ? "none" : "height 150ms ease-out",
@@ -72,7 +72,7 @@ export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) 
     >
       {!collapsed && (
         <div
-          className="h-1 hover:bg-slate-600 cursor-ns-resize transition-colors shrink-0"
+          className="h-1 shrink-0 cursor-ns-resize bg-slate-800 transition-colors hover:bg-indigo-500/70"
           onMouseDown={() => setIsDragging(true)}
           title="Drag to resize console"
         />
@@ -81,7 +81,7 @@ export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) 
       <button
         type="button"
         onClick={onToggle}
-        className="flex h-10 w-full items-center justify-between px-3 text-left font-medium text-slate-300 hover:bg-slate-900 transition-colors shrink-0"
+        className="flex h-10 w-full shrink-0 items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-3 text-left font-medium text-slate-300 transition-colors hover:bg-slate-900"
       >
         <div className="flex items-center gap-2">
           <svg
@@ -111,10 +111,11 @@ export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) 
       </button>
 
       {!collapsed && (
-        <div className="grid grid-cols-3 gap-0 border-t border-slate-800 flex-1 min-h-0 overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-3 gap-0 overflow-hidden border-t border-slate-800/60">
           <LogPane title="Messages" events={events} />
-          <div className="scrollbar-hide overflow-auto border-l border-slate-800 p-3">
-            <div className="mb-3 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
+          <div className="scrollbar-hide overflow-auto border-l border-slate-800/60 bg-slate-950/40 p-3">
+            <div className="mb-3 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
               Files Changed
             </div>
             {files.length === 0 ? (
@@ -129,8 +130,9 @@ export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) 
               </ul>
             )}
           </div>
-          <div className="scrollbar-hide overflow-auto border-l border-slate-800 p-3">
-            <div className="mb-3 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
+          <div className="scrollbar-hide overflow-auto border-l border-slate-800/60 bg-slate-950/40 p-3">
+            <div className="mb-3 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
               Validation Evidence
             </div>
             {run?.validationEvidence ? (
@@ -164,8 +166,9 @@ function LogPane({ title, events }: { title: string; events: ConsoleEvent[] }) {
   }, [events.length]);
 
   return (
-    <div className="scrollbar-hide overflow-auto p-3">
-      <div className="mb-3 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
+    <div className="scrollbar-hide overflow-auto bg-slate-950/20 p-3">
+      <div className="mb-3 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
         {title}
       </div>
       {events.length === 0 ? (
@@ -175,7 +178,7 @@ function LogPane({ title, events }: { title: string; events: ConsoleEvent[] }) {
       ) : (
         <ul className="space-y-1.5">
           {events.map((e) => (
-            <li key={e.id} className="font-mono text-[10px] leading-relaxed">
+            <li key={e.id} className="rounded-md bg-slate-900/50 px-2 py-1.5 font-mono text-[10px] leading-relaxed">
               <span className="text-slate-500">
                 {new Date(e.ts).toLocaleTimeString()}
               </span>{" "}
@@ -191,10 +194,19 @@ function LogPane({ title, events }: { title: string; events: ConsoleEvent[] }) {
 }
 
 function FileRow({ file }: { file: FileChange }) {
+  const actionStyle =
+    file.action === "modified"
+      ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/20"
+      : file.action === "verified"
+        ? "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/20"
+        : "bg-slate-800 text-slate-400 ring-1 ring-slate-700";
+
   return (
-    <li className="flex items-center justify-between gap-2 font-mono text-slate-300 text-[10px] py-1">
+    <li className="flex items-center justify-between gap-2 rounded-md bg-slate-900/50 px-2 py-1.5 font-mono text-[10px] text-slate-300">
       <span className="truncate">{file.path}</span>
-      <span className="shrink-0 text-slate-400 text-[9px]">{file.action}</span>
+      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium ${actionStyle}`}>
+        {file.action}
+      </span>
     </li>
   );
 }
