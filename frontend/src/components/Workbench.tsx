@@ -436,6 +436,7 @@ function WorkbenchInner() {
   const onGateDecide = async (payload: {
     action: "approve" | "reject" | "edit";
     editedText?: string;
+    feedback?: string;
   }) => {
     if (!run) return;
     setBusy(true);
