@@ -14,24 +14,9 @@ DEFAULT_WORKFLOW: dict = {
     "maxAttempts": 3,
     "nodes": [
         {
-            "id": "input",
-            "type": "loopNode",
-            "position": {"x": 40, "y": 180},
-            "data": {
-                "label": "Coding Objective",
-                "description": "Objective and constraints",
-                "nodeType": "input",
-                "objective": "",
-                "constraints": "",
-                "targetRepo": None,
-                "mainTargetFile": None,
-                "validateCommand": None,
-            },
-        },
-        {
             "id": "criteria",
             "type": "loopNode",
-            "position": {"x": 280, "y": 80},
+            "position": {"x": 40, "y": 80},
             "data": {
                 "label": "Success Criteria Agent",
                 "description": "Generate measurable success criteria",
@@ -45,6 +30,11 @@ DEFAULT_WORKFLOW: dict = {
                 "tools": ["Repo Reader", "Search"],
                 "maxRetries": 2,
                 "timeout": 300,
+                "objective": "",
+                "constraints": "",
+                "targetRepo": None,
+                "mainTargetFile": None,
+                "validateCommand": None,
             },
         },
         {
@@ -74,6 +64,16 @@ DEFAULT_WORKFLOW: dict = {
                 "tools": ["Repo Reader", "Search"],
                 "maxRetries": 2,
                 "timeout": 300,
+            },
+        },
+        {
+            "id": "gate-plan",
+            "type": "loopNode",
+            "position": {"x": 410, "y": 280},
+            "data": {
+                "label": "Review & Approve Plan",
+                "description": "Approve architecture and steps",
+                "nodeType": "humanGate",
             },
         },
         {
@@ -168,7 +168,6 @@ DEFAULT_WORKFLOW: dict = {
         },
     ],
     "edges": [
-        {"id": "e-input-criteria", "source": "input", "target": "criteria"},
         {
             "id": "e-criteria-gate",
             "source": "criteria",
@@ -189,7 +188,26 @@ DEFAULT_WORKFLOW: dict = {
             "label": "reject",
             "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
         },
-        {"id": "e-planning-exec", "source": "planning", "target": "execution"},
+        {
+            "id": "e-planning-gate-plan",
+            "source": "planning",
+            "target": "gate-plan",
+            "sourceHandle": "success",
+        },
+        {
+            "id": "e-gate-plan-exec",
+            "source": "gate-plan",
+            "target": "execution",
+            "sourceHandle": "approve",
+        },
+        {
+            "id": "e-gate-plan-stop",
+            "source": "gate-plan",
+            "target": "stop",
+            "sourceHandle": "reject",
+            "label": "reject",
+            "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
+        },
         {"id": "e-exec-cmd", "source": "execution", "target": "command"},
         {"id": "e-cmd-val", "source": "command", "target": "validation"},
         {"id": "e-val-decision", "source": "validation", "target": "decision"},
