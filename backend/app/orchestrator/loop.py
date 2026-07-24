@@ -434,6 +434,13 @@ def continue_run(
                     target_repo=run.targetRepo,
                 )
                 run.criteria = result["criteria"]
+                for i, c in enumerate(run.criteria):
+                    append_event(
+                        run,
+                        level="info",
+                        node_id=node_id,
+                        message=f"Criterion {i + 1}: {c}",
+                    )
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
                     status="completed",

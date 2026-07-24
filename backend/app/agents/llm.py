@@ -142,6 +142,11 @@ def chat_text(
             model_id=model_id, system=system, user=user, json_mode=json_mode
         )
 
+    if json_mode:
+        has_json = "json" in (system or "").lower() or "json" in (user or "").lower()
+        if not has_json:
+            system = (system or "") + "\n\nNote: You must respond in valid JSON format."
+
     client = _openai_client(provider)
     kwargs: dict[str, Any] = {
         "model": model_id,

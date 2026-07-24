@@ -167,10 +167,22 @@ def generate_success_criteria(
         raw = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(criteria))
         return {"criteria": criteria, "raw": raw}
 
+    system_prompt = (
+        "You are an expert Product Owner, QA Lead, and Systems Architect. "
+        "Your task is to convert the user's high-level engineering objective into concrete, measurable success criteria.\n\n"
+        "Instructions:\n"
+        "1. Identify the core user-journeys or functionality requested (e.g. user authentication, catalog browsing, cart operations, transaction payment, publishing steps, chronological feeds).\n"
+        "2. Break down the objective into sequential, verifiable milestones that define completion.\n"
+        "3. Include both functional outcomes (actions a user/system can perform) and technical constraints (tests passing, linting, files to edit).\n"
+        "4. Format the milestones clearly as distinct, actionable items.\n"
+        "5. Return a JSON object in the exact format: { \"criteria\": string[] }."
+    )
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+
     text = chat_text(
         model=model,
-        system=instructions
-        or "Convert the engineering objective into measurable success criteria. Return JSON { criteria: string[] }.",
+        system=system_prompt,
         user=(
             f"Objective:\n{objective}\n\nConstraints:\n{constraints}\n\n"
             f"{_scope_note(main_target_file, target_repo)}"
@@ -234,10 +246,17 @@ def generate_plan(
         )
         return {"plan": plan, "steps": steps, "raw": plan}
 
+    system_prompt = (
+        "Create a concrete, step-by-step implementation plan naming the files to create, modify, or delete in the workspace.\n"
+        "Ensure the plan is detailed, realistic, and matches existing code design patterns.\n"
+        "Return a JSON object in the exact format: { \"steps\": string[], \"plan\": string }."
+    )
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+
     text = chat_text(
         model=model,
-        system=instructions
-        or "Create a concrete implementation plan naming real files. Return JSON { steps: string[], plan: string }.",
+        system=system_prompt,
         user=json.dumps(
             {
                 "objective": objective,
@@ -325,15 +344,15 @@ def execute_changes(
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"
 
+    system_prompt = "Implement the planned changes using tools."
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+    system_prompt += f" {scope} Stop when the plan is implemented."
+
     scope = _scope_note(main_target_file, target_repo)
     transcript, _ = chat_with_tools(
         model=model,
-        system=(
-            (instructions or "Implement the planned changes using tools.")
-            + " "
-            + scope
-            + " Stop when the plan is implemented."
-        ),
+        system=system_prompt,
         user=json.dumps(
             {
                 "objective": objective,
@@ -365,13 +384,14 @@ def summarize_validation(
         prefix = "Validation PASSED." if passed else "Validation FAILED."
         return f"{prefix}\n{evidence}"
 
+    system_prompt = "Summarize validation evidence. Never change the pass/fail verdict."
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+    system_prompt += f" Deterministic verdict is: {'PASS' if passed else 'FAIL'}."
+
     return chat_text(
         model=model,
-        system=(
-            instructions
-            or "Summarize validation evidence. Never change the pass/fail verdict."
-        )
-        + f" Deterministic verdict is: {'PASS' if passed else 'FAIL'}.",
+        system=system_prompt,
         user=evidence,
         json_mode=False,
     )
