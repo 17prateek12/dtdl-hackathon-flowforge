@@ -109,7 +109,7 @@ class NodeExecutionReceipt(BaseModel):
 
 class PendingHumanGate(BaseModel):
     nodeId: str
-    kind: Literal["criteria", "final", "extra_files"]
+    kind: Literal["criteria", "plan", "final", "extra_files"]
     title: str
     summary: str
     editableText: Optional[str] = None

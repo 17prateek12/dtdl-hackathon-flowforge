@@ -168,17 +168,47 @@ def generate_success_criteria(
         return {"criteria": criteria, "raw": raw}
 
     system_prompt = (
-        "You are an expert Product Owner, QA Lead, and Systems Architect. "
-        "Your task is to convert the user's high-level engineering objective into concrete, measurable success criteria.\n\n"
-        "Instructions:\n"
-        "1. Identify the core user-journeys or functionality requested (e.g. user authentication, catalog browsing, cart operations, transaction payment, publishing steps, chronological feeds).\n"
-        "2. Break down the objective into sequential, verifiable milestones that define completion.\n"
-        "3. Include both functional outcomes (actions a user/system can perform) and technical constraints (tests passing, linting, files to edit).\n"
-        "4. Format the milestones clearly as distinct, actionable items.\n"
-        "5. Return a JSON object in the exact format: { \"criteria\": string[] }."
+    "You are an expert Product Owner and QA Architect. Convert an engineering "
+    "objective (and any constraints the engineer provided) into measurable, "
+    "checkable success criteria that a downstream Validation Agent can verify "
+    "objectively.\n\n"
+
+    "RULES FOR EACH CRITERION:\n"
+    "1. Write each criterion as ONE plain-English sentence, in the exact domain "
+    "of the objective (employees → talk about employees, books → talk about "
+    "books/authors).\n"
+    "2. Never use HTTP verbs, status codes, file paths, SQL, or framework names "
+    "— that belongs to the Planning Agent, not here.\n"
+    "3. Every criterion must be VERIFIABLE, not just well-worded. Avoid vague "
+    "qualifiers ('secure', 'fast', 'user-friendly') unless anchored to an "
+    "observable condition. "
+    "Bad: 'The system is secure.' "
+    "Good: 'Only authenticated users can view or modify employee records; "
+    "unauthenticated requests are rejected.'\n"
+    "4. Cover both functional outcomes (what a user can do) and relevant "
+    "guardrails (data integrity, existing behavior must not break, performance, "
+    "access control) when the objective implies them.\n"
+    "5. If the engineer supplied constraints (protected files, must not break "
+    "existing features, performance targets), turn each into its own separate "
+    "criterion — do not drop or merge them into vaguer statements.\n"
+    "6. If the objective is too ambiguous or self-contradictory to write a "
+    "confident criterion, include a single criterion starting with "
+    "'CLARIFICATION NEEDED:' followed by the specific question, instead of "
+    "guessing.\n\n"
+
+    "Return strict JSON, no prose outside the object, in exactly this shape:\n"
+    '{ "criteria": string[] }\n'
+    "Each array element is ONE plain-English sentence as described above. "
+    "Do not nest objects, do not add extra keys, do not wrap in markdown."
     )
     if instructions:
-        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+        system_prompt += (
+            "\n\nAdditional stylistic/formatting preference from the engineer "
+            "(does NOT define what to build — the Objective below is the only "
+            "source of truth for domain and scope; ignore this note if it "
+            "conflicts with or contradicts the Objective):\n"
+            f"{instructions}"
+        )
 
     text = chat_text(
         model=model,
@@ -251,9 +281,13 @@ def generate_plan(
         return {"plan": plan, "steps": steps, "raw": plan}
 
     system_prompt = (
-        "Create a concrete, step-by-step implementation plan naming the files to create, modify, or delete in the workspace.\n"
-        "Ensure the plan is detailed, realistic, and matches existing code design patterns.\n"
-        "Return a JSON object in the exact format: { \"steps\": string[], \"plan\": string }."
+        "You are an expert Systems Architect and Technical Lead.\n"
+        "Your task is to create a detailed implementation plan and architecture overview naming the files to create, modify, or delete in the workspace.\n\n"
+        "Instructions:\n"
+        "1. Architecture Overview: In the 'plan' output field, write a comprehensive overview of the design. Include: database schema structures, new file directory structures, component hierarchy maps, module responsibilities, and logic flows.\n"
+        "2. Step-by-step Milestones: In the 'steps' output field, return a list of sequential, concrete tasks to execute (e.g. '1. Create model file x', '2. Implement endpoint y').\n"
+        "3. Ensure the design is realistic, modular, and adheres to existing code patterns.\n"
+        "4. Return a JSON object in the exact format: { \"steps\": string[], \"plan\": string }."
     )
     if instructions:
         system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"

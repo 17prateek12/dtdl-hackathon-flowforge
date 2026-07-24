@@ -22,8 +22,8 @@
         "timeout": null,
         "command": null,
         "fileChecks": null,
-        "objective": "Add a GET /health endpoint that returns JSON { status: \"healthy\" } with HTTP 200, and ensure unit tests pass.",
-        "constraints": "Only modify files under demo-repo. Follow existing patterns in src/app.js. Do not remove the existing GET / route.",
+        "objective": "Add a GET /health endpoint that returns JSON { status: 'healthy' } with HTTP 200, and ensure unit tests pass.",
+        "constraints": "Keep it simple",
         "targetRepo": null,
         "mainTargetFile": null,
         "targetFiles": null,
@@ -42,7 +42,7 @@
         "description": "Generate measurable success criteria",
         "nodeType": "agent",
         "role": "successCriteria",
-        "instructions": "ok give me healthcare admin app to manage patient",
+        "instructions": "Give HR portal for employee management",
         "model": "gpt-4o-mini",
         "tools": [
           "Repo Reader",
@@ -312,6 +312,33 @@
         "targetFiles": null,
         "validateCommand": null
       }
+    },
+    {
+      "id": "gate-plan",
+      "type": "loopNode",
+      "position": {
+        "x": 410.0,
+        "y": 280.0
+      },
+      "data": {
+        "label": "Review & Approve Plan",
+        "description": "Approve architecture and steps",
+        "nodeType": "humanGate",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
     }
   ],
   "edges": [
@@ -359,13 +386,36 @@
       "animated": null
     },
     {
-      "id": "e-planning-exec",
+      "id": "e-planning-gate-plan",
       "source": "planning",
-      "target": "execution",
-      "sourceHandle": null,
+      "target": "gate-plan",
+      "sourceHandle": "success",
       "targetHandle": null,
       "label": null,
       "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-plan-exec",
+      "source": "gate-plan",
+      "target": "execution",
+      "sourceHandle": "approve",
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-plan-stop",
+      "source": "gate-plan",
+      "target": "stop",
+      "sourceHandle": "reject",
+      "targetHandle": null,
+      "label": "reject",
+      "style": {
+        "stroke": "#ef4444",
+        "strokeDasharray": "6 4"
+      },
       "animated": null
     },
     {
