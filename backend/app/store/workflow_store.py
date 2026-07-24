@@ -83,6 +83,16 @@ DEFAULT_WORKFLOW: dict = {
             },
         },
         {
+            "id": "gate-plan",
+            "type": "loopNode",
+            "position": {"x": 410, "y": 280},
+            "data": {
+                "label": "Human Gate (Review Plan)",
+                "description": "Review and approve implementation plan",
+                "nodeType": "humanGate",
+            },
+        },
+        {
             "id": "execution",
             "type": "loopNode",
             "position": {"x": 540, "y": 280},
@@ -126,7 +136,7 @@ DEFAULT_WORKFLOW: dict = {
                     "Summarize validation evidence. Do not override deterministic "
                     "check results."
                 ),
-                "fileChecks": ["src/app.js"],
+                "fileChecks": [],
                 "model": "mistral-small-latest",
                 "maxRetries": 1,
                 "timeout": 120,
@@ -195,7 +205,13 @@ DEFAULT_WORKFLOW: dict = {
             "label": "reject",
             "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
         },
-        {"id": "e-planning-exec", "source": "planning", "target": "execution"},
+        {"id": "e-planning-gate", "source": "planning", "target": "gate-plan"},
+        {
+            "id": "e-gate-exec",
+            "source": "gate-plan",
+            "target": "execution",
+            "sourceHandle": "approve",
+        },
         {"id": "e-exec-cmd", "source": "execution", "target": "command"},
         {"id": "e-cmd-val", "source": "command", "target": "validation"},
         {"id": "e-val-decision", "source": "validation", "target": "decision"},
@@ -243,10 +259,23 @@ def load_workflow(workflow_id: str = "default") -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow_id)
     if path.exists():
-        return Workflow.model_validate(json.loads(path.read_text()))
-    workflow = Workflow.model_validate(deepcopy(DEFAULT_WORKFLOW))
-    save_workflow(workflow)
-    return workflow
+        try:
+            return Workflow.model_validate(json.loads(path.read_text()))
+        except Exception as err:
+            print(f"[WorkflowStore] Error parsing {path}, resetting to default: {err}")
+    try:
+        workflow = Workflow.model_validate(deepcopy(DEFAULT_WORKFLOW))
+        save_workflow(workflow)
+        return workflow
+    except Exception as err:
+        print(f"[WorkflowStore] Fallback to DEFAULT_WORKFLOW failed: {err}")
+        return Workflow.model_construct(
+            id="default",
+            name="New Workflow",
+            maxAttempts=3,
+            nodes=[],
+            edges=[],
+        )
 
 
 def save_workflow(workflow: Workflow) -> Workflow:

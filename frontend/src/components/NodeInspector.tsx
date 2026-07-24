@@ -72,35 +72,6 @@ export function NodeInspector({ node, onChange }: Props) {
                 Relative to repo root, or absolute path on your machine.
               </p>
             </Field>
-            <Field label="Main target file">
-              <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
-                placeholder="src/app.js"
-                value={d.mainTargetFile || d.targetFiles?.[0] || ""}
-                onChange={(e) =>
-                  onChange(node.id, {
-                    mainTargetFile: e.target.value.trim(),
-                    targetFiles: e.target.value.trim()
-                      ? [e.target.value.trim()]
-                      : [],
-                  })
-                }
-              />
-              <p className="mt-1 text-[11px] text-slate-400">
-                Primary file the agent should focus on. If it edits other files,
-                you will be asked to approve those changes with a reason.
-              </p>
-            </Field>
-            <Field label="Validate command">
-              <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 font-mono text-sm"
-                placeholder="npm test"
-                value={d.validateCommand || ""}
-                onChange={(e) =>
-                  onChange(node.id, { validateCommand: e.target.value })
-                }
-              />
-            </Field>
           </>
         )}
 

@@ -71,6 +71,40 @@ def search_repo(query: str, rel_path: str = ".") -> list[str]:
     return hits
 
 
+def grep_search(query: str, rel_path: str = ".") -> list[dict[str, Any]]:
+    """Grep search repository files for code patterns or keywords with line numbers."""
+    root = _resolve_safe(rel_path)
+    cmd = f'grep -rnI --exclude-dir={{node_modules,.git,.venv,__pycache__,dist,build}} "{query}" .'
+    try:
+        res = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        matches: list[dict[str, Any]] = []
+        if res.stdout:
+            for line in res.stdout.splitlines():
+                if len(matches) >= 50:
+                    break
+                parts = line.split(":", 2)
+                if len(parts) == 3:
+                    fpath = parts[0].lstrip("./")
+                    if fpath.startswith("git/") or any(ignored in fpath for ignored in ("node_modules", ".git", ".venv", "__pycache__", "dist", "build")):
+                        continue
+                    matches.append({
+                        "file": fpath,
+                        "line": int(parts[1]) if parts[1].isdigit() else 0,
+                        "content": parts[2].strip(),
+                    })
+        return matches
+    except Exception as exc:
+        return [{"error": str(exc)}]
+
+
+
 def run_shell(command: str, timeout_sec: int = 120) -> dict:
     try:
         completed = subprocess.run(

@@ -5,7 +5,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT / ".env")
+if (ROOT / ".env").exists():
+    load_dotenv(ROOT / ".env")
+elif (ROOT / ".env ").exists():
+    load_dotenv(ROOT / ".env ")
+else:
+    load_dotenv()
 
 DATA_DIR = ROOT / "data"
 WORKFLOWS_DIR = DATA_DIR / "workflows"

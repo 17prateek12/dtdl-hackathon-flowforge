@@ -1,6 +1,6 @@
 {
   "id": "default",
-  "name": "New Workflow",
+  "name": "Default Coding Loop",
   "maxAttempts": 3,
   "nodes": [
     {
@@ -22,8 +22,12 @@
         "timeout": null,
         "command": null,
         "fileChecks": null,
-        "objective": "Add a GET /add_sum endpoint that returns JSON { status: \"healthy\" } with HTTP 200, and ensure unit tests pass.",
-        "constraints": "Only modify files under demo-repo. Follow existing patterns in src/app.js. Do not remove the existing GET / route."
+        "objective": "write code for add two number",
+        "constraints": "write using python function",
+        "targetRepo": "/home/administrator/ai_testing",
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -38,8 +42,8 @@
         "description": "Generate measurable success criteria",
         "nodeType": "agent",
         "role": "successCriteria",
-        "instructions": "Convert the engineering objective into measurable success criteria. Ensure the criteria are specific, verifiable and prioritized.",
-        "model": "gpt-4o-mini",
+        "instructions": "if 2+3=5 then success otherwise fail",
+        "model": "mistral-small-latest",
         "tools": [
           "Repo Reader",
           "Search"
@@ -49,7 +53,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -72,7 +80,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -87,8 +99,8 @@
         "description": "Create / revise implementation plan",
         "nodeType": "agent",
         "role": "planning",
-        "instructions": "Create or revise a concrete implementation plan grounded in real files in the repository. Name modules, order of work, and risks.",
-        "model": "gpt-4o-mini",
+        "instructions": "make proper plan to write code and get approval",
+        "model": "mistral-small-latest",
         "tools": [
           "Repo Reader",
           "Search"
@@ -98,7 +110,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -114,7 +130,7 @@
         "nodeType": "agent",
         "role": "execution",
         "instructions": "Implement the planned changes in the repository. Follow coding standards and existing patterns. Prefer minimal diffs.",
-        "model": "gpt-4o-mini",
+        "model": "mistral-small-latest",
         "tools": [
           "File Editor",
           "Search",
@@ -126,7 +142,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -149,7 +169,11 @@
         "command": "npm test",
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -165,7 +189,7 @@
         "nodeType": "validator",
         "role": "validation",
         "instructions": "Summarize validation evidence. Do not override deterministic check results.",
-        "model": "gpt-4o-mini",
+        "model": "mistral-small-latest",
         "tools": null,
         "maxRetries": 1,
         "timeout": 120,
@@ -174,7 +198,11 @@
           "src/app.js"
         ],
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -197,7 +225,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -220,7 +252,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -243,7 +279,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -266,30 +306,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
-      }
-    },
-    {
-      "id": "input-1784893716003",
-      "type": "loopNode",
-      "position": {
-        "x": 394.0,
-        "y": -141.0
-      },
-      "data": {
-        "label": "Input",
-        "description": "",
-        "nodeType": "input",
-        "role": null,
-        "instructions": null,
-        "model": null,
-        "tools": null,
-        "maxRetries": null,
-        "timeout": null,
-        "command": null,
-        "fileChecks": null,
-        "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     }
   ],

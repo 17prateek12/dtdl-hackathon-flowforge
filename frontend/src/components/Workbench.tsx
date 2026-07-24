@@ -14,6 +14,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HumanGateModal } from "@/components/HumanGateModal";
+import { RAGCodebaseModal } from "@/components/RAGCodebaseModal";
+import { Database } from "lucide-react";
 import {
   LoopNode,
   type LoopFlowNode,
@@ -22,6 +24,7 @@ import { NodeInspector } from "@/components/NodeInspector";
 import { NodeLibrary } from "@/components/NodeLibrary";
 import { RunConsole } from "@/components/RunConsole";
 import type { RunRecord, Workflow, WorkflowNode, NodeType } from "@/lib/types";
+
 
 const nodeTypes = { loopNode: LoopNode };
 
@@ -87,6 +90,16 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
       },
     },
     {
+      id: "gate-plan",
+      type: "loopNode",
+      position: { x: 410, y: 280 },
+      data: {
+        label: "Human Gate (Review Plan)",
+        description: "Review and approve implementation plan",
+        nodeType: "humanGate",
+      },
+    },
+    {
       id: "execution",
       type: "loopNode",
       position: { x: 540, y: 280 },
@@ -126,7 +139,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
         role: "validation",
         instructions:
           "Summarize validation evidence. Do not override deterministic check results.",
-        fileChecks: ["src/app.js"],
+        fileChecks: [],
         model: "gpt-4o-mini",
         maxRetries: 1,
         timeout: 120,
@@ -195,7 +208,13 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
       label: "reject",
       style: { stroke: "#ef4444", strokeDasharray: "6 4" },
     },
-    { id: "e-planning-exec", source: "planning", target: "execution" },
+    { id: "e-planning-gate", source: "planning", target: "gate-plan" },
+    {
+      id: "e-gate-exec",
+      source: "gate-plan",
+      target: "execution",
+      sourceHandle: "approve",
+    },
     { id: "e-exec-cmd", source: "execution", target: "command" },
     { id: "e-cmd-val", source: "command", target: "validation" },
     { id: "e-val-decision", source: "validation", target: "decision" },
@@ -268,6 +287,8 @@ function WorkbenchInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<any[]>([]);
+  const [isRagModalOpen, setIsRagModalOpen] = useState(false);
+
 
   useEffect(() => {
     void (async () => {
@@ -280,9 +301,63 @@ function WorkbenchInner() {
         if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
           throw new Error("Invalid workflow response from server");
         }
+
+        // Restore previously selected codebase from localStorage after refresh
+        if (typeof window !== "undefined") {
+          const savedRepo = localStorage.getItem("flowforge_selected_repo");
+          const savedFilesRaw = localStorage.getItem("flowforge_selected_files");
+          let savedFiles: string[] | null = null;
+          if (savedFilesRaw) {
+            try { savedFiles = JSON.parse(savedFilesRaw); } catch {}
+          }
+
+          if (savedRepo || savedFiles) {
+            data.nodes = data.nodes.map((n) => {
+              if (n.id === "input") {
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    targetRepo: savedRepo || n.data.targetRepo,
+                    targetFiles: savedFiles || n.data.targetFiles,
+                  },
+                };
+              }
+              return n;
+            });
+          }
+        }
+
         setWorkflow(data);
+        setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        console.warn("Workflow fetch error, using default template:", err);
+        const data = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_WORKFLOW)) as Workflow;
+        if (typeof window !== "undefined") {
+          const savedRepo = localStorage.getItem("flowforge_selected_repo");
+          const savedFilesRaw = localStorage.getItem("flowforge_selected_files");
+          let savedFiles: string[] | null = null;
+          if (savedFilesRaw) {
+            try { savedFiles = JSON.parse(savedFilesRaw); } catch {}
+          }
+          if (savedRepo || savedFiles) {
+            data.nodes = data.nodes.map((n) => {
+              if (n.id === "input") {
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    targetRepo: savedRepo || n.data.targetRepo,
+                    targetFiles: savedFiles || n.data.targetFiles,
+                  },
+                };
+              }
+              return n;
+            });
+          }
+        }
+        setWorkflow(data);
+        setError(null);
       }
     })();
     void (async () => {
@@ -345,6 +420,14 @@ function WorkbenchInner() {
 
   const onNodeChange = useCallback(
     (nodeId: string, patch: Partial<WorkflowNode["data"]>) => {
+      if (nodeId === "input") {
+        if (patch.targetRepo !== undefined && typeof window !== "undefined") {
+          localStorage.setItem("flowforge_selected_repo", patch.targetRepo || "");
+        }
+        if (patch.targetFiles !== undefined && typeof window !== "undefined") {
+          localStorage.setItem("flowforge_selected_files", JSON.stringify(patch.targetFiles || []));
+        }
+      }
       setWorkflow((prev) => {
         if (!prev) return prev;
         return {
@@ -559,6 +642,14 @@ function WorkbenchInner() {
           </span>
           <button
             type="button"
+            onClick={() => setIsRagModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition"
+          >
+            <Database className="w-4 h-4 text-indigo-600" />
+            RAG Codebase
+          </button>
+          <button
+            type="button"
             onClick={() => void saveWorkflow()}
             disabled={busy || !workflow}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
@@ -644,6 +735,24 @@ function WorkbenchInner() {
         gate={run?.pendingGate ?? null}
         busy={busy}
         onDecide={(p) => void onGateDecide(p)}
+      />
+
+      <RAGCodebaseModal
+        isOpen={isRagModalOpen}
+        onClose={() => setIsRagModalOpen(false)}
+        targetRepo={
+          (workflow?.nodes?.find((n) => n.id === "input")?.data as any)?.targetRepo ||
+          "./demo-repo"
+        }
+        targetFiles={
+          (workflow?.nodes?.find((n) => n.id === "input")?.data as any)?.targetFiles || []
+        }
+        onSelectTargetRepo={(repo) => {
+          onNodeChange("input", { targetRepo: repo });
+        }}
+        onSelectTargetFiles={(files) => {
+          onNodeChange("input", { targetFiles: files });
+        }}
       />
     </div>
   );

@@ -7,41 +7,6 @@ from app.agents import tools as repo_tools
 from app.agents.llm import chat_text, chat_with_tools, use_mock
 from app.models import FileChange
 
-HEALTH_FIX = '''import http from "node:http";
-
-/**
- * Tiny demo API — includes /health for the coding-loop demo.
- */
-export function createApp() {
-  return http.createServer((req, res) => {
-    if (req.url === "/" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ name: "demo-api", status: "ok" }));
-      return;
-    }
-
-    if (req.url === "/health" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "healthy" }));
-      return;
-    }
-
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "not found" }));
-  });
-}
-
-export function startServer(port = 0) {
-  const server = createApp();
-  return new Promise((resolve) => {
-    server.listen(port, "127.0.0.1", () => {
-      const address = server.address();
-      resolve({ server, port: address.port });
-    });
-  });
-}
-'''
-
 TOOL_DEFS = [
     {
         "type": "function",
@@ -96,6 +61,21 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "grep_search",
+            "description": "Grep search repository files for code patterns, function names, endpoints, or keywords with line numbers",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search keyword or pattern to grep for"},
+                    "path": {"type": "string", "description": "Directory path to search in (default .)"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_shell",
             "description": "Run a shell command inside demo-repo",
             "parameters": {
@@ -124,6 +104,12 @@ def _scope_note(
     return "\n".join(parts)
 
 
+from app.agents import langchain_agents
+from app.agents import tools as repo_tools
+from app.agents.llm import chat_text, chat_with_tools, use_mock
+from app.models import FileChange
+
+
 def generate_success_criteria(
     *,
     objective: str,
@@ -135,29 +121,22 @@ def generate_success_criteria(
 ) -> dict[str, Any]:
     if use_mock():
         criteria = [
-            "GET /health returns HTTP 200",
-            'Response body includes { "status": "healthy" }',
-            "Existing GET / route continues to work",
-            "npm test exits with code 0",
-            "Implementation lives in src/app.js following existing patterns",
+            f"Fulfill primary objective: {objective}",
+            f"Adhere strictly to constraints: {constraints}" if constraints else "Maintain codebase patterns and pass tests",
+            "Ensure implementation is fully verified and tests pass with exit code 0",
         ]
         raw = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(criteria))
         return {"criteria": criteria, "raw": raw}
 
-    text = chat_text(
+    scope_note = _scope_note(main_target_file, target_repo)
+    return langchain_agents.run_langchain_success_criteria(
+        objective=objective,
+        constraints=constraints,
+        instructions=instructions,
         model=model,
-        system=instructions
-        or "Convert the engineering objective into measurable success criteria. Return JSON { criteria: string[] }.",
-        user=(
-            f"Objective:\n{objective}\n\nConstraints:\n{constraints}\n\n"
-            f"{_scope_note(main_target_file, target_repo)}"
-        ),
-        json_mode=True,
+        scope_note=scope_note,
     )
-    parsed = json.loads(text or "{}")
-    criteria = parsed.get("criteria") or []
-    raw = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(criteria))
-    return {"criteria": criteria, "raw": raw}
+
 
 
 def generate_plan(
@@ -172,7 +151,7 @@ def generate_plan(
     target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
     listing = ", ".join(repo_tools.list_dir("."))
-    sample_path = main_target_file or "src/app.js"
+    sample_path = main_target_file or "package.json"
     try:
         sample_src = repo_tools.read_file(sample_path)
     except Exception:  # noqa: BLE001
@@ -180,51 +159,33 @@ def generate_plan(
 
     if use_mock():
         steps = [
-            "Read src/app.js and understand the HTTP router pattern",
-            "Add a GET /health branch returning JSON { status: 'healthy' }",
-            "Keep the existing GET / route unchanged",
-            "Run npm test and fix until green",
+            f"Analyze codebase and inspect files for objective: {objective[:120]}",
+            f"Apply changes adhering to constraints: {constraints[:120]}" if constraints else "Implement required logic",
+            "Verify all changes against success criteria and execute validation checks",
         ]
         if feedback:
-            steps.insert(0, f"Address previous failure: {feedback[:200]}")
+            steps.insert(0, f"Address previous failure feedback: {feedback[:200]}")
         plan = "\n".join(
             [
-                "Plan grounded in demo-repo:",
-                f"- Files: src/app.js, test/app.test.js (listing: {listing})",
+                f"Implementation plan for objective: {objective}",
+                f"- Repository listing: {listing}",
                 *[f"{i + 1}. {s}" for i, s in enumerate(steps)],
-                "Risk: breaking existing / route if conditions are ordered poorly",
             ]
         )
         return {"plan": plan, "steps": steps, "raw": plan}
 
-    text = chat_text(
+    return langchain_agents.run_langchain_planning(
+        objective=objective,
+        constraints=constraints,
+        criteria=criteria,
+        feedback=feedback,
+        instructions=instructions,
         model=model,
-        system=instructions
-        or "Create a concrete implementation plan naming real files. Return JSON { steps: string[], plan: string }.",
-        user=json.dumps(
-            {
-                "objective": objective,
-                "constraints": constraints,
-                "criteria": criteria,
-                "feedback": feedback,
-                "repoListing": listing,
-                "sampleFile": sample_path,
-                "sampleSource": sample_src,
-                "scope": _scope_note(main_target_file, target_repo),
-            }
-        ),
-        json_mode=True,
+        repo_listing=listing,
+        sample_path=sample_path,
+        sample_src=sample_src,
+        scope_note=_scope_note(main_target_file, target_repo),
     )
-    parsed = json.loads(text or "{}")
-    steps = parsed.get("steps") or []
-    plan = parsed.get("plan") or "\n".join(
-        f"{i + 1}. {s}" for i, s in enumerate(steps)
-    )
-    return {"plan": plan, "steps": steps, "raw": plan}
-
-
-def _apply_health_endpoint_fix() -> list[FileChange]:
-    return [repo_tools.write_file("src/app.js", HEALTH_FIX)]
 
 
 def execute_changes(
@@ -240,29 +201,24 @@ def execute_changes(
     target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
     if use_mock():
+        target = main_target_file or "codebase"
         transcript = [
-            "Analyzing codebase structure in demo-repo/",
-            "Reading src/app.js router pattern",
+            f"Analyzing codebase structure in {target_repo or '.'}",
+            f"Inspecting code context for objective: {objective[:100]}",
         ]
         if force_fail:
             transcript.append(
-                "Skipping write intentionally to demonstrate validation failure on attempt 1"
+                "Skipping file modification (forced failure state)."
             )
             return {
                 "summary": "No file changes made (forced fail for demo loop).",
                 "filesChanged": [],
                 "transcript": transcript,
             }
-        files_changed = _apply_health_endpoint_fix()
-        transcript.extend(
-            [
-                "Creating GET /health handler in src/app.js",
-                "Preserving existing GET / route",
-            ]
-        )
+        transcript.append(f"Successfully applied changes for objective: {objective[:100]}")
         return {
-            "summary": "Implemented GET /health in src/app.js",
-            "filesChanged": files_changed,
+            "summary": f"Executed changes for objective: {objective[:100]}",
+            "filesChanged": [],
             "transcript": transcript,
         }
 
@@ -279,37 +235,25 @@ def execute_changes(
             return change.model_dump_json()
         if name == "search":
             return json.dumps(repo_tools.search_repo(args["query"]))
+        if name == "grep_search":
+            return json.dumps(repo_tools.grep_search(args["query"], args.get("path") or "."))
         if name == "run_shell":
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"
 
-    scope = _scope_note(main_target_file, target_repo)
-    transcript, _ = chat_with_tools(
+    res = langchain_agents.run_langchain_execution(
+        objective=objective,
+        plan=plan,
+        criteria=criteria,
+        feedback=feedback,
+        instructions=instructions,
         model=model,
-        system=(
-            (instructions or "Implement the planned changes using tools.")
-            + " "
-            + scope
-            + " Stop when the plan is implemented."
-        ),
-        user=json.dumps(
-            {
-                "objective": objective,
-                "plan": plan,
-                "criteria": criteria,
-                "feedback": feedback,
-                "mainTargetFile": main_target_file or "",
-            }
-        ),
-        tools=TOOL_DEFS,
-        execute_tool=execute_tool,
+        execute_tool_func=execute_tool,
+        tools_defs=TOOL_DEFS,
+        scope_note=_scope_note(main_target_file, target_repo),
     )
-
-    return {
-        "summary": transcript[-1] if transcript else "Execution complete",
-        "filesChanged": files_changed,
-        "transcript": transcript,
-    }
+    res["filesChanged"] = files_changed
+    return res
 
 
 def summarize_validation(
@@ -323,13 +267,10 @@ def summarize_validation(
         prefix = "Validation PASSED." if passed else "Validation FAILED."
         return f"{prefix}\n{evidence}"
 
-    return chat_text(
+    return langchain_agents.run_langchain_validation(
+        passed=passed,
+        evidence=evidence,
+        instructions=instructions,
         model=model,
-        system=(
-            instructions
-            or "Summarize validation evidence. Never change the pass/fail verdict."
-        )
-        + f" Deterministic verdict is: {'PASS' if passed else 'FAIL'}.",
-        user=evidence,
-        json_mode=False,
     )
+

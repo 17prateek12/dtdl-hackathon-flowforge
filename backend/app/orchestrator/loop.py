@@ -5,6 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from pathlib import Path
 
 from app.agents import runner as agents
 from app.agents import tools as repo_tools
@@ -48,10 +49,10 @@ def _next_targets(
         if edge.source != source_id:
             continue
         if handle is None:
-            if edge.sourceHandle in (None, "success"):
+            if edge.sourceHandle in (None, "success", "approve"):
                 targets.append(edge.target)
         elif edge.sourceHandle == handle or (
-            edge.sourceHandle is None and handle == "success"
+            edge.sourceHandle is None and handle in ("success", "approve")
         ):
             targets.append(edge.target)
     return targets
@@ -92,6 +93,41 @@ def _resolve_main_target(input_node: WorkflowNode) -> str:
         if parsed:
             return parsed[0]
     return ""
+
+
+def _resolve_validate_command(run: RunRecord, node_command: Optional[str]) -> str:
+    if run.validateCommand and run.validateCommand.strip():
+        return run.validateCommand.strip()
+    
+    target_path = Path(run.targetRepo or ".")
+    if (target_path / "package.json").exists():
+        return node_command or "npm test"
+
+    # Python repository auto-detection
+    if list(target_path.glob("test_*.py")) or list(target_path.glob("*_test.py")) or (target_path / "pytest.ini").exists():
+        return "pytest"
+    
+    if list(target_path.glob("*.py")):
+        return "python3 -m unittest discover -s . -p 'test_*.py'"
+    
+    if node_command and node_command != "npm test":
+        return node_command
+        
+    return "echo 'Validation complete'"
+
+
+def _resolve_file_checks(run: RunRecord, node_checks: Optional[list[str]]) -> list[str]:
+    checks: list[str] = []
+    if run.mainTargetFile:
+        checks.append(run.mainTargetFile)
+    for f in run.targetFiles:
+        if f and f not in checks:
+            checks.append(f)
+    if node_checks:
+        for f in node_checks:
+            if f and f != "src/app.js" and f not in checks:
+                checks.append(f)
+    return [c for c in checks if (Path(run.targetRepo or ".") / c).exists()]
 
 
 def _extra_file_reason(
@@ -258,6 +294,14 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
                 level="info",
                 node_id=gate_id,
                 message=f"Criteria edited ({len(run.criteria)} items)",
+            )
+        elif gate_kind == "plan":
+            run.plan = decision.editedText.strip()
+            append_event(
+                run,
+                level="info",
+                node_id=gate_id,
+                message="Implementation plan updated by human user",
             )
 
     if decision.action == "reject":
@@ -477,8 +521,23 @@ def continue_run(
                     node_id=node_id,
                     message=f"Plan ready ({len(result['steps']) or 'n'} steps)",
                 )
+                run.pendingGate = PendingHumanGate(
+                    nodeId=node_id,
+                    kind="plan",
+                    title="Review & Approve Implementation Plan",
+                    summary="The Planning Agent generated an implementation plan. Review, edit, or approve the plan before execution begins.",
+                    editableText=result["plan"],
+                )
+                _set_status(run, node_id, "waiting")
+                run.status = "waiting_for_human"
+                append_event(
+                    run,
+                    level="warn",
+                    node_id=node_id,
+                    message="Paused for human approval: Review generated plan",
+                )
                 _flush(run)
-                queue.extend(_next_targets(workflow, node_id))
+                return
 
             elif ntype == "agent" and node.data.role == "execution":
                 force_fail = (
@@ -553,11 +612,7 @@ def continue_run(
                 queue.extend(_next_targets(workflow, node_id))
 
             elif ntype == "command":
-                cmd = (
-                    run.validateCommand
-                    or node.data.command
-                    or "npm test"
-                )
+                cmd = _resolve_validate_command(run, node.data.command)
                 last_command = run_command_node(cmd, node.data.timeout or 120)
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
@@ -590,10 +645,10 @@ def continue_run(
                         stderr="No command result available",
                         command="(none)",
                     )
+                file_checks = _resolve_file_checks(run, node.data.fileChecks)
                 det = deterministic_validate(
                     command_result=last_command,
-                    file_checks=node.data.fileChecks
-                    or ([run.mainTargetFile] if run.mainTargetFile else None),
+                    file_checks=file_checks,
                 )
                 last_validation_passed = det["passed"]
                 run.validationEvidence = det["evidence"]

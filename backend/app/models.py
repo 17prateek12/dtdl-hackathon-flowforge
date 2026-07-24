@@ -109,7 +109,7 @@ class NodeExecutionReceipt(BaseModel):
 
 class PendingHumanGate(BaseModel):
     nodeId: str
-    kind: Literal["criteria", "final", "extra_files"]
+    kind: Literal["criteria", "final", "extra_files", "plan"]
     title: str
     summary: str
     editableText: Optional[str] = None
@@ -153,3 +153,17 @@ class HumanGateDecision(BaseModel):
 
 class StartRunBody(BaseModel):
     workflowId: str = "default"
+
+
+class RAGIndexRequest(BaseModel):
+    targetRepo: Optional[str] = "./demo-repo"
+    targetFiles: Optional[list[str]] = None
+    chunkSize: int = 400
+    chunkOverlap: int = 50
+
+
+class RAGSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+    targetFiles: Optional[list[str]] = None
+
