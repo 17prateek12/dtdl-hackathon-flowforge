@@ -50,7 +50,7 @@ export function NodeLibrary({ onLoadTemplate }: Props) {
         </div>
         <button
           type="button"
-          onClick={onLoadTemplate}
+          onClick={() => onLoadTemplate?.()}
           className="mt-2 w-full rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-3 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 active:opacity-75"
         >
           Default four-agent coding loop

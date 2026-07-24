@@ -470,11 +470,9 @@ function WorkbenchInner() {
       const { type } = JSON.parse(data) as { type: NodeType };
       if (!type || !workflow) return;
 
-      // Convert screen coordinates to flow coordinates
-      const bounds = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const position = reactFlow.screenToFlowPosition({
-        x: e.clientX - bounds.left,
-        y: e.clientY - bounds.top,
+        x: e.clientX,
+        y: e.clientY,
       });
 
       // Generate unique ID for the new node

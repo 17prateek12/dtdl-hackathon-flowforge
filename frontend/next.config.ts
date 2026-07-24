@@ -27,7 +27,7 @@ function loadRootEnv() {
 
 loadRootEnv();
 
-const API_ORIGIN = process.env.LOOPFORGE_API_ORIGIN || "http://127.0.0.1:8001";
+const API_ORIGIN = process.env.LOOPFORGE_API_ORIGIN || "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   async rewrites() {
