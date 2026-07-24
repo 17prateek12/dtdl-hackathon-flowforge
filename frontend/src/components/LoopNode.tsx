@@ -78,7 +78,8 @@ export function LoopNode({ data, selected }: NodeProps<LoopFlowNode>) {
     <div
       className={`min-w-[200px] max-w-[240px] rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${style.accent} ${STATUS_RING[status]} ${selected ? "shadow-md" : ""}`}
     >
-      {data.nodeType !== "success" && data.nodeType !== "stop" && (
+      {/* Every node except 'input' can be a target */}
+      {data.nodeType !== "input" && (
         <Handle type="target" position={Position.Left} className="!bg-slate-400" />
       )}
       {data.nodeType === "input" && (

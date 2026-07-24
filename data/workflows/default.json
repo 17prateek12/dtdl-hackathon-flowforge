@@ -22,7 +22,7 @@
         "timeout": null,
         "command": null,
         "fileChecks": null,
-        "objective": "Add a GET /health endpoint that returns JSON { status: \"healthy\" } with HTTP 200, and ensure unit tests pass.",
+        "objective": "Add a GET /add_sum endpoint that returns JSON { status: \"healthy\" } with HTTP 200, and ensure unit tests pass.",
         "constraints": "Only modify files under demo-repo. Follow existing patterns in src/app.js. Do not remove the existing GET / route."
       }
     },
@@ -257,6 +257,29 @@
         "label": "Stop",
         "description": "Stopped Safely",
         "nodeType": "stop",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null
+      }
+    },
+    {
+      "id": "input-1784893716003",
+      "type": "loopNode",
+      "position": {
+        "x": 394.0,
+        "y": -141.0
+      },
+      "data": {
+        "label": "Input",
+        "description": "",
+        "nodeType": "input",
         "role": null,
         "instructions": null,
         "model": null,

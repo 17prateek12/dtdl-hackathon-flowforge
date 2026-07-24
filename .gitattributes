@@ -1,0 +1,2 @@
+frontend/postcss.config.mjs merge=ours
+frontend/next.config.ts merge=ours

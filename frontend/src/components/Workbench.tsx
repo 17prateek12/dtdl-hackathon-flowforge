@@ -325,7 +325,18 @@ function WorkbenchInner() {
     }));
   }, [workflow, run]);
 
-  const edges: Edge[] = useMemo(() => workflow?.edges ?? [], [workflow]);
+  const edges: Edge[] = useMemo(
+    () =>
+      (workflow?.edges ?? []).map((e) => ({
+        ...e,
+        // React Flow treats any non-undefined handle as a specific id.
+        // Null from the API serialisation must become undefined so React Flow
+        // falls back to the default (un-named) handle on each node.
+        sourceHandle: e.sourceHandle ?? undefined,
+        targetHandle: e.targetHandle ?? undefined,
+      })),
+    [workflow],
+  );
 
   const selectedNode: WorkflowNode | null = useMemo(() => {
     if (!workflow?.nodes || !selectedId) return null;

@@ -40,8 +40,24 @@ free_port() {
   fi
 }
 
-# Kill all background children on exit / Ctrl-C
-trap 'echo ""; warn "Shutting down..."; kill 0 2>/dev/null; exit 0' EXIT INT TERM
+# ── Shutdown handler (runs exactly once) ────────────────────────────────────
+_SHUTDOWN=false
+_shutdown() {
+  # Guard against re-entrant calls (EXIT fires after INT/TERM kills the script)
+  if [[ "${_SHUTDOWN}" == true ]]; then return; fi
+  _SHUTDOWN=true
+  echo ""
+  warn "Shutting down — stopping backend and frontend..."
+  # Kill tracked PIDs gracefully first, then force
+  [[ -n "${BACKEND_PID:-}"  ]] && kill "${BACKEND_PID}"  2>/dev/null || true
+  [[ -n "${FRONTEND_PID:-}" ]] && kill "${FRONTEND_PID}" 2>/dev/null || true
+  sleep 1
+  [[ -n "${BACKEND_PID:-}"  ]] && kill -9 "${BACKEND_PID}"  2>/dev/null || true
+  [[ -n "${FRONTEND_PID:-}" ]] && kill -9 "${FRONTEND_PID}" 2>/dev/null || true
+  success "All servers stopped. Goodbye."
+}
+trap '_shutdown' INT TERM
+trap '_shutdown' EXIT
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
