@@ -229,10 +229,14 @@ def generate_plan(
 
     if use_mock():
         steps = [
-            "Read src/app.js and understand the HTTP router pattern",
-            "Add a GET /health branch returning JSON { status: 'healthy' }",
-            "Keep the existing GET / route unchanged",
-            "Run npm test and fix until green",
+             "Analyze the engineering objective and understand the expected outcome.",
+             "Inspect the repository structure, architecture, and relevant modules.",
+             "Identify the files and components that need to be modified or created.",
+             "Analyze dependencies and interactions with existing code.",
+             "Break the implementation into small, sequential tasks with clear objectives.",
+             "Estimate the complexity and potential impact of each task.",
+             "Document assumptions, constraints, and any open questions.",
+             "Produce a structured implementation plan for the Execution Agent without generating code.",
         ]
         if feedback:
             steps.insert(0, f"Address previous failure: {feedback[:200]}")

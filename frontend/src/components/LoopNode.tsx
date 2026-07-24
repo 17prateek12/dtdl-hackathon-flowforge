@@ -8,6 +8,49 @@ import {
 } from "@xyflow/react";
 import type { NodeStatus, NodeType, WorkflowNodeConfig } from "@/lib/types";
 
+// Animation styles
+const animationStyles = `
+  @keyframes node-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+    50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+  }
+  
+  @keyframes node-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
+  }
+  
+  @keyframes node-success-flash {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.8); }
+    100% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+  }
+  
+  @keyframes checkmark-draw {
+    0% { stroke-dashoffset: 50; opacity: 0; }
+    50% { opacity: 1; }
+    100% { stroke-dashoffset: 0; opacity: 1; }
+  }
+  
+  .node-running {
+    animation: node-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .node-failed {
+    animation: node-shake 0.5s cubic-bezier(0.36, 0, 0.66, 1) 0.2s;
+  }
+  
+  .node-success {
+    animation: node-success-flash 0.6s cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  
+  .checkmark-icon {
+    stroke-dasharray: 50;
+    stroke-dashoffset: 50;
+    animation: checkmark-draw 0.5s ease-in-out 0.1s forwards;
+  }
+`;
+
 const TYPE_STYLES: Record<
   NodeType,
   { accent: string; badge: string; icon: string }
@@ -52,9 +95,9 @@ const TYPE_STYLES: Record<
 
 const STATUS_RING: Record<NodeStatus, string> = {
   idle: "",
-  running: "ring-2 ring-blue-500 ring-offset-2 animate-pulse",
-  completed: "ring-2 ring-emerald-400 ring-offset-1",
-  failed: "ring-2 ring-rose-500 ring-offset-1",
+  running: "node-running",
+  completed: "node-success ring-2 ring-emerald-400 ring-offset-1",
+  failed: "node-failed ring-2 ring-rose-500 ring-offset-1",
   waiting: "ring-2 ring-amber-400 ring-offset-2",
   skipped: "opacity-50",
 };
@@ -73,11 +116,15 @@ export function LoopNode({ data, selected }: NodeProps<LoopFlowNode>) {
   const isGate = data.nodeType === "humanGate";
   const isTerminal =
     data.nodeType === "success" || data.nodeType === "stop";
+  const isSucceeded = status === "completed";
+  const isFailed = status === "failed";
 
   return (
-    <div
-      className={`min-w-[200px] max-w-[240px] rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${style.accent} ${STATUS_RING[status]} ${selected ? "shadow-md" : ""}`}
-    >
+    <>
+      <style>{animationStyles}</style>
+      <div
+        className={`min-w-[200px] max-w-[240px] rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${style.accent} ${STATUS_RING[status]} ${selected ? "shadow-md" : ""} transition-all`}
+      >
       {data.nodeType !== "success" && data.nodeType !== "stop" && (
         <Handle type="target" position={Position.Left} className="!bg-slate-400" />
       )}
@@ -153,6 +200,14 @@ export function LoopNode({ data, selected }: NodeProps<LoopFlowNode>) {
           />
         </>
       )}
-    </div>
+      </div>
+      {isSucceeded && (
+        <div className="absolute -top-2 -right-2 flex items-center justify-center w-7 h-7 bg-emerald-500 rounded-full">
+          <svg className="checkmark-icon w-5 h-5 text-white stroke-white" fill="none" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
+    </>
   );
 }

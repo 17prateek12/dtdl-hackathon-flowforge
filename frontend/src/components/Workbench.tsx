@@ -325,7 +325,14 @@ function WorkbenchInner() {
     }));
   }, [workflow, run]);
 
-  const edges: Edge[] = useMemo(() => workflow?.edges ?? [], [workflow]);
+  const edges: Edge[] = useMemo(() => {
+    const baseEdges = workflow?.edges ?? [];
+    const isRunning = run?.status === "running" || run?.status === "waiting_for_human";
+    return baseEdges.map((edge) => ({
+      ...edge,
+      animated: isRunning ? true : edge.animated,
+    }));
+  }, [workflow, run]);
 
   const selectedNode: WorkflowNode | null = useMemo(() => {
     if (!workflow?.nodes || !selectedId) return null;
@@ -610,11 +617,6 @@ function WorkbenchInner() {
           >
             <Background gap={18} size={1} color="#e2e8f0" />
             <Controls />
-            <MiniMap
-              pannable
-              zoomable
-              className="!bg-white !border !border-slate-200"
-            />
           </ReactFlow>
         </div>
         <NodeInspector node={selectedNode} onChange={onNodeChange} />
