@@ -11,7 +11,16 @@ const LIBRARY = [
   { type: "stop", label: "Stop", hint: "Stopped safely" },
 ];
 
-export function NodeLibrary() {
+interface Props {
+  onLoadTemplate?: () => void;
+}
+
+export function NodeLibrary({ onLoadTemplate }: Props) {
+  const handleDragStart = (e: React.DragEvent, item: typeof LIBRARY[0]) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/json", JSON.stringify({ type: item.type }));
+  };
+
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
       <div className="border-b border-slate-200 px-3 py-2.5">
@@ -19,14 +28,16 @@ export function NodeLibrary() {
           Node Library
         </div>
         <p className="mt-1 text-[11px] text-slate-400">
-          MVP: default graph is preloaded. Select a node to edit settings.
+          Drag nodes to canvas
         </p>
       </div>
       <div className="flex-1 space-y-1 overflow-auto p-2">
         {LIBRARY.map((item) => (
           <div
             key={item.type}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-2"
+            draggable
+            onDragStart={(e) => handleDragStart(e, item)}
+            className="cursor-move rounded-lg border border-slate-200 bg-white px-2.5 py-2 hover:bg-slate-100 active:opacity-75"
           >
             <div className="text-sm font-medium text-slate-800">{item.label}</div>
             <div className="text-[11px] text-slate-500">{item.hint}</div>
@@ -37,9 +48,13 @@ export function NodeLibrary() {
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Templates
         </div>
-        <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-3 text-[11px] text-slate-400">
+        <button
+          type="button"
+          onClick={onLoadTemplate}
+          className="mt-2 w-full rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-3 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 active:opacity-75"
+        >
           Default four-agent coding loop
-        </div>
+        </button>
       </div>
     </aside>
   );
