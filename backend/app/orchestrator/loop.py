@@ -8,6 +8,7 @@ from typing import Optional
 
 from app.agents import runner as agents
 from app.agents import tools as repo_tools
+from app.agents.workspace import RepoWorkspace, bind_workspace, normalize_rel_path, parse_target_files
 from app.models import (
     HumanGateDecision,
     NodeExecutionReceipt,
@@ -74,9 +75,80 @@ def _spawn(run_id: str, from_node_id: Optional[str] = None, via_handle: Optional
     thread.start()
 
 
+def _workspace_for_run(run: RunRecord) -> RepoWorkspace:
+    return RepoWorkspace.create(
+        target_repo=run.targetRepo or None,
+        main_target_file=run.mainTargetFile or None,
+    )
+
+
+def _resolve_main_target(input_node: WorkflowNode) -> str:
+    main = (input_node.data.mainTargetFile or "").strip()
+    if main:
+        return normalize_rel_path(main)
+    raw_files = input_node.data.targetFiles
+    if raw_files:
+        parsed = parse_target_files(raw_files)
+        if parsed:
+            return parsed[0]
+    return ""
+
+
+def _extra_file_reason(
+    path: str,
+    *,
+    transcript: list[str],
+    plan: str,
+) -> str:
+    name = path.rsplit("/", 1)[-1]
+    for line in transcript:
+        if path in line or name in line:
+            return line.strip()[:240]
+    for line in plan.splitlines():
+        if path in line or name in line:
+            return line.strip()[:240]
+    return "Agent changed this file while implementing the plan."
+
+
+def _extra_files_summary(run: RunRecord, extra_files: list[str]) -> str:
+    receipt = run.receipts.get("execution")
+    transcript = list(receipt.commands or []) if receipt else []
+    lines = [
+        f"The agent changed files outside the main target ({run.mainTargetFile or 'not set'}).",
+        "Review each file and approve or reject the extra changes.",
+        "Rejecting will roll back all execution changes and generate a new plan.",
+        "",
+    ]
+    for path in extra_files:
+        change = next((f for f in run.filesChanged if f.path == path), None)
+        action = change.action if change else "modified"
+        reason = _extra_file_reason(path, transcript=transcript, plan=run.plan)
+        lines.extend(
+            [
+                f"• {path} ({action})",
+                f"  Reason: {reason}",
+                "",
+            ]
+        )
+    return "\n".join(lines).strip()
+
+
+def _unapproved_extra_files(run: RunRecord, changed_paths: list[str]) -> list[str]:
+    extra = repo_tools.list_extra_file_changes(changed_paths)
+    approved = set(run.approvedExtraFiles or [])
+    return [path for path in extra if path not in approved]
+
+
 def start_run(workflow_id: str = "default") -> RunRecord:
     workflow = load_workflow(workflow_id)
     input_node = _find_node(workflow, "input")
+    main_target = _resolve_main_target(input_node)
+
+    workspace = RepoWorkspace.create(
+        target_repo=input_node.data.targetRepo,
+        main_target_file=main_target or None,
+    )
+    bind_workspace(workspace)
     baseline = repo_tools.git_snapshot()
 
     node_statuses = {n.id: "idle" for n in workflow.nodes}
@@ -92,6 +164,10 @@ def start_run(workflow_id: str = "default") -> RunRecord:
         filesChanged=[],
         objective=input_node.data.objective or "",
         constraints=input_node.data.constraints or "",
+        targetRepo=str(workspace.root),
+        mainTargetFile=workspace.main_target_file or "",
+        targetFiles=[workspace.main_target_file] if workspace.main_target_file else [],
+        validateCommand=input_node.data.validateCommand or "",
         criteria=[],
         plan="",
         startedAt=_now(),
@@ -105,6 +181,19 @@ def start_run(workflow_id: str = "default") -> RunRecord:
         node_id="input",
         message=f"Objective received: {run.objective}",
     )
+    if run.mainTargetFile:
+        append_event(
+            run,
+            level="info",
+            node_id="input",
+            message=f"Main target file: {run.mainTargetFile}",
+        )
+    append_event(
+        run,
+        level="info",
+        node_id="input",
+        message=f"Target codebase: {run.targetRepo}",
+    )
     _set_status(run, "input", "completed")
     run.receipts["input"] = NodeExecutionReceipt(
         nodeId="input",
@@ -115,7 +204,7 @@ def start_run(workflow_id: str = "default") -> RunRecord:
     _flush(run)
 
     with _lock:
-        _active[run.id] = {"stopped": False}
+        _active[run.id] = {"stopped": False, "workspace": workspace}
     _spawn(run.id)
     return run
 
@@ -148,12 +237,13 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
         return run
 
     gate_id = run.pendingGate.nodeId
+    gate_kind = run.pendingGate.kind
     append_event(
         run, level="info", node_id=gate_id, message=f"Human decision: {decision.action}"
     )
 
     if decision.action == "edit" and decision.editedText:
-        if run.pendingGate.kind == "criteria":
+        if gate_kind == "criteria":
             cleaned: list[str] = []
             for line in decision.editedText.splitlines():
                 text = line.strip()
@@ -171,6 +261,56 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
             )
 
     if decision.action == "reject":
+        if gate_kind == "extra_files":
+            extra = run.pendingGate.extraFiles or []
+            receipt = run.receipts.get(gate_id)
+            exec_paths = [
+                f.path for f in (receipt.filesChanged if receipt and receipt.filesChanged else [])
+            ]
+            if not exec_paths:
+                exec_paths = [f.path for f in run.filesChanged]
+
+            if exec_paths:
+                repo_tools.revert_files(exec_paths)
+                reverted = set(exec_paths)
+                run.filesChanged = [f for f in run.filesChanged if f.path not in reverted]
+
+            user_note = (decision.feedback or decision.editedText or "").strip()
+            run.validationEvidence = (
+                "Human rejected extra file changes"
+                + (f" ({', '.join(extra)})" if extra else "")
+                + ". All code changes from the last execution were rolled back. "
+                "Create a new plan that better matches the objective."
+                + (f"\n\nHuman instructions:\n{user_note}" if user_note else "")
+            )
+
+            _set_status(run, gate_id, "idle")
+            run.receipts[gate_id] = NodeExecutionReceipt(
+                nodeId=gate_id,
+                status="skipped",
+                output="Rolled back — replanning after extra-file rejection",
+                finishedAt=_now(),
+            )
+            run.pendingGate = None
+            run.status = "running"
+            append_event(
+                run,
+                level="warn",
+                node_id=gate_id,
+                message=(
+                    "Extra file changes rejected; rolled back execution and "
+                    "returning to planning"
+                    + (f" — note: {user_note[:120]}" if user_note else "")
+                ),
+            )
+            _flush(run)
+            ws = _workspace_for_run(run)
+            bind_workspace(ws)
+            with _lock:
+                _active[run.id] = {"stopped": False, "workspace": ws}
+            _spawn(run.id, "planning", "restart")
+            return run
+
         _set_status(run, gate_id, "completed")
         run.receipts[gate_id] = NodeExecutionReceipt(
             nodeId=gate_id,
@@ -191,6 +331,28 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
         _flush(run)
         return run
 
+    if gate_kind == "extra_files":
+        approved = run.pendingGate.extraFiles or []
+        if approved:
+            merged = list(dict.fromkeys([*(run.approvedExtraFiles or []), *approved]))
+            run.approvedExtraFiles = merged
+        run.pendingGate = None
+        run.status = "running"
+        _set_status(run, gate_id, "completed")
+        append_event(
+            run,
+            level="success",
+            node_id=gate_id,
+            message="Extra file changes approved",
+        )
+        _flush(run)
+        ws = _workspace_for_run(run)
+        bind_workspace(ws)
+        with _lock:
+            _active[run.id] = {"stopped": False, "workspace": ws}
+        _spawn(run.id, gate_id)
+        return run
+
     _set_status(run, gate_id, "completed")
     run.receipts[gate_id] = NodeExecutionReceipt(
         nodeId=gate_id,
@@ -202,8 +364,10 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
     run.status = "running"
     _flush(run)
 
+    ws = _workspace_for_run(run)
+    bind_workspace(ws)
     with _lock:
-        _active[run.id] = {"stopped": False}
+        _active[run.id] = {"stopped": False, "workspace": ws}
     _spawn(run.id, gate_id, "approve")
     return run
 
@@ -227,9 +391,14 @@ def continue_run(
     run = load_run(run_id)
     if not run:
         return
+    with _lock:
+        ws = _active.get(run_id, {}).get("workspace")
+    bind_workspace(ws if ws else _workspace_for_run(run))
     workflow = load_workflow(run.workflowId)
 
-    if from_node_id and via_handle:
+    if from_node_id and via_handle == "restart":
+        queue = [from_node_id]
+    elif from_node_id and via_handle:
         queue = _next_targets(workflow, from_node_id, via_handle)
     elif from_node_id:
         queue = _next_targets(workflow, from_node_id)
@@ -261,6 +430,8 @@ def continue_run(
                     constraints=run.constraints,
                     instructions=node.data.instructions,
                     model=node.data.model,
+                    main_target_file=run.mainTargetFile or None,
+                    target_repo=run.targetRepo,
                 )
                 run.criteria = result["criteria"]
                 run.receipts[node_id] = NodeExecutionReceipt(
@@ -288,6 +459,8 @@ def continue_run(
                     feedback=run.validationEvidence,
                     instructions=node.data.instructions,
                     model=node.data.model,
+                    main_target_file=run.mainTargetFile or None,
+                    target_repo=run.targetRepo,
                 )
                 run.plan = result["plan"]
                 run.receipts[node_id] = NodeExecutionReceipt(
@@ -320,6 +493,8 @@ def continue_run(
                     instructions=node.data.instructions,
                     model=node.data.model,
                     force_fail=force_fail,
+                    main_target_file=run.mainTargetFile or None,
+                    target_repo=run.targetRepo,
                 )
                 files = result["filesChanged"] or repo_tools.git_diff_stat()
                 for f in files:
@@ -351,10 +526,38 @@ def continue_run(
                     message=f"Execution finished ({len(files)} file changes)",
                 )
                 _flush(run)
+
+                extra = _unapproved_extra_files(run, [f.path for f in files])
+                if extra and run.mainTargetFile:
+                    run.pendingGate = PendingHumanGate(
+                        nodeId=node_id,
+                        kind="extra_files",
+                        title="Approve changes to additional files",
+                        summary=_extra_files_summary(run, extra),
+                        extraFiles=extra,
+                    )
+                    _set_status(run, node_id, "waiting")
+                    run.status = "waiting_for_human"
+                    append_event(
+                        run,
+                        level="warn",
+                        node_id=node_id,
+                        message=(
+                            "Paused for approval: agent changed files outside "
+                            f"{run.mainTargetFile} → {', '.join(extra)}"
+                        ),
+                    )
+                    _flush(run)
+                    return
+
                 queue.extend(_next_targets(workflow, node_id))
 
             elif ntype == "command":
-                cmd = node.data.command or "npm test"
+                cmd = (
+                    run.validateCommand
+                    or node.data.command
+                    or "npm test"
+                )
                 last_command = run_command_node(cmd, node.data.timeout or 120)
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
@@ -389,7 +592,8 @@ def continue_run(
                     )
                 det = deterministic_validate(
                     command_result=last_command,
-                    file_checks=node.data.fileChecks,
+                    file_checks=node.data.fileChecks
+                    or ([run.mainTargetFile] if run.mainTargetFile else None),
                 )
                 last_validation_passed = det["passed"]
                 run.validationEvidence = det["evidence"]

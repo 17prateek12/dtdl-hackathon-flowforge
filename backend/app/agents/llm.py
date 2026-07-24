@@ -19,12 +19,28 @@ def _truthy(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
 
 
+def _mistral_model_id() -> str:
+    return (
+        os.getenv("MISTRAL_MODEL")
+        or os.getenv("CHAT_MODEL")
+        or "mistral-small-latest"
+    )
+
+
 def list_models() -> list[ModelOption]:
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    mistral_model = _mistral_model_id()
 
     return [
+        ModelOption(
+            id=mistral_model,
+            label=f"Mistral · {mistral_model}",
+            provider="mistral",
+            available=bool(os.getenv("MISTRAL_API_KEY")),
+            env_key="MISTRAL_API_KEY",
+        ),
         ModelOption(
             id=openai_model,
             label=f"OpenAI · {openai_model}",
@@ -67,6 +83,9 @@ def resolve_provider(model: Optional[str]) -> tuple[str, str]:
         return by_id[model].provider, by_id[model].id
 
     lowered = (model or "").lower()
+    if lowered.startswith("mistral") or "mistral" in lowered:
+        m = next(x for x in models if x.provider == "mistral")
+        return "mistral", model or m.id
     if lowered.startswith("claude") or "anthropic" in lowered:
         m = next(x for x in models if x.provider == "anthropic")
         return "anthropic", model or m.id
@@ -74,7 +93,10 @@ def resolve_provider(model: Optional[str]) -> tuple[str, str]:
         m = next(x for x in models if x.provider == "gemini")
         return "gemini", model or m.id
 
-    # default OpenAI
+    # Prefer Mistral when configured, else OpenAI
+    if os.getenv("MISTRAL_API_KEY"):
+        m = next(x for x in models if x.provider == "mistral")
+        return "mistral", model or m.id
     m = next(x for x in models if x.provider == "openai")
     return "openai", model or m.id
 
@@ -90,6 +112,13 @@ def _openai_client(provider: str):
             "GEMINI_BASE_URL",
             "https://generativelanguage.googleapis.com/v1beta/openai/",
         )
+        return OpenAI(api_key=key, base_url=base)
+
+    if provider == "mistral":
+        key = os.getenv("MISTRAL_API_KEY")
+        if not key:
+            raise RuntimeError("MISTRAL_API_KEY is not set")
+        base = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
         return OpenAI(api_key=key, base_url=base)
 
     key = os.getenv("OPENAI_API_KEY")
@@ -121,7 +150,7 @@ def chat_text(
             {"role": "user", "content": user},
         ],
     }
-    if json_mode and provider == "openai":
+    if json_mode and provider in {"openai", "mistral", "gemini"}:
         kwargs["response_format"] = {"type": "json_object"}
     completion = client.chat.completions.create(**kwargs)
     return completion.choices[0].message.content or ""
