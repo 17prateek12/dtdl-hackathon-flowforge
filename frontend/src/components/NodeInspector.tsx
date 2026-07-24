@@ -31,7 +31,7 @@ export function NodeInspector({ node, onChange, models }: Props) {
   const d = node.data;
   const showAgent = d.nodeType === "agent" || d.nodeType === "validator";
   const showCommand = d.nodeType === "command";
-  const showInput = d.nodeType === "input" || d.role === "successCriteria";
+  const showInput = d.nodeType === "input";
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">

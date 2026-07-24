@@ -143,12 +143,12 @@ def start_run(workflow_id: str = "default", workflow: Optional["Workflow"] = Non
     from app.models import Workflow as WorkflowModel
     if workflow is None:
         workflow = load_workflow(workflow_id)
-    input_node = _find_node(workflow, "criteria")
+    input_node = _find_node(workflow, "input")
 
     objective = (input_node.data.objective or "").strip()
     if not objective:
         raise ValueError(
-            "No objective provided. Please fill in the 'Coding Objective' field in the Success Criteria Agent node before running."
+            "No objective provided. Please fill in the 'Coding Objective' field in the Input node before running."
         )
 
     main_target = _resolve_main_target(input_node)
@@ -187,21 +187,28 @@ def start_run(workflow_id: str = "default", workflow: Optional["Workflow"] = Non
     append_event(
         run,
         level="info",
-        node_id="criteria",
+        node_id="input",
         message=f"Objective received: {run.objective}",
     )
     if run.mainTargetFile:
         append_event(
             run,
             level="info",
-            node_id="criteria",
+            node_id="input",
             message=f"Main target file: {run.mainTargetFile}",
         )
     append_event(
         run,
         level="info",
-        node_id="criteria",
+        node_id="input",
         message=f"Target codebase: {run.targetRepo}",
+    )
+    _set_status(run, "input", "completed")
+    run.receipts["input"] = NodeExecutionReceipt(
+        nodeId="input",
+        status="completed",
+        output=run.objective,
+        finishedAt=_now(),
     )
     _flush(run)
 

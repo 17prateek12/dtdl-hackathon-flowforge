@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 const LIBRARY = [
+  { type: "input", label: "Input", hint: "Objective & constraints" },
   { type: "agent", label: "Agent", hint: "Criteria / plan / execute" },
   { type: "command", label: "Command", hint: "Build, test, shell" },
   { type: "validator", label: "Validator", hint: "Deterministic checks" },

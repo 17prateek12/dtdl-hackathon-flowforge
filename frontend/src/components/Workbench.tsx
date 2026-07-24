@@ -31,9 +31,21 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
   maxAttempts: 3,
   nodes: [
     {
+      id: "input",
+      type: "loopNode",
+      position: { x: 40, y: 180 },
+      data: {
+        label: "Coding Objective",
+        description: "Objective and constraints",
+        nodeType: "input",
+        objective: "",
+        constraints: "",
+      },
+    },
+    {
       id: "criteria",
       type: "loopNode",
-      position: { x: 40, y: 80 },
+      position: { x: 280, y: 80 },
       data: {
         label: "Success Criteria Agent",
         description: "Generate measurable success criteria",
@@ -45,11 +57,6 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
         tools: ["Repo Reader", "Search"],
         maxRetries: 2,
         timeout: 300,
-        objective: "",
-        constraints: "",
-        targetRepo: "",
-        mainTargetFile: "",
-        validateCommand: "",
       },
     },
     {
@@ -77,16 +84,6 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
         tools: ["Repo Reader", "Search"],
         maxRetries: 2,
         timeout: 300,
-      },
-    },
-    {
-      id: "gate-plan",
-      type: "loopNode",
-      position: { x: 410, y: 280 },
-      data: {
-        label: "Review & Approve Plan",
-        description: "Approve architecture and steps",
-        nodeType: "humanGate",
       },
     },
     {
@@ -177,6 +174,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
     },
   ],
   edges: [
+    { id: "e-input-criteria", source: "input", target: "criteria" },
     {
       id: "e-criteria-gate",
       source: "criteria",
@@ -197,26 +195,7 @@ const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
       label: "reject",
       style: { stroke: "#ef4444", strokeDasharray: "6 4" },
     },
-    {
-      id: "e-planning-gate-plan",
-      source: "planning",
-      target: "gate-plan",
-      sourceHandle: "success",
-    },
-    {
-      id: "e-gate-plan-exec",
-      source: "gate-plan",
-      target: "execution",
-      sourceHandle: "approve",
-    },
-    {
-      id: "e-gate-plan-stop",
-      source: "gate-plan",
-      target: "stop",
-      sourceHandle: "reject",
-      label: "reject",
-      style: { stroke: "#ef4444", strokeDasharray: "6 4" },
-    },
+    { id: "e-planning-exec", source: "planning", target: "execution" },
     { id: "e-exec-cmd", source: "execution", target: "command" },
     { id: "e-cmd-val", source: "command", target: "validation" },
     { id: "e-val-decision", source: "validation", target: "decision" },
@@ -448,13 +427,13 @@ function WorkbenchInner() {
 
   const startRun = async () => {
     // Guard: objective must be set before running
-    const criteriaNode = workflow?.nodes.find((n) => n.id === "criteria");
-    const objective = (criteriaNode?.data?.objective ?? "").trim();
+    const inputNode = workflow?.nodes.find((n) => n.id === "input");
+    const objective = (inputNode?.data?.objective ?? "").trim();
     if (!objective) {
       setError(
-        "Please fill in the Coding Objective in the Success Criteria Agent node before running."
+        "Please fill in the Coding Objective in the Input node before running."
       );
-      setSelectedId("criteria");
+      setSelectedId("input");
       return;
     }
 
@@ -522,7 +501,7 @@ function WorkbenchInner() {
 
   const onLoadTemplate = useCallback(() => {
     setWorkflow(DEFAULT_TEMPLATE_WORKFLOW);
-    setSelectedId("criteria");
+    setSelectedId("input");
     setRun(null);
   }, []);
 

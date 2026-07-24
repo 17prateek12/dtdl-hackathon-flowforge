@@ -106,7 +106,7 @@ export interface NodeExecutionReceipt {
 
 export interface PendingHumanGate {
   nodeId: string;
-  kind: "criteria" | "plan" | "final" | "extra_files";
+  kind: "criteria" | "final" | "extra_files";
   title: string;
   summary: string;
   editableText?: string;
