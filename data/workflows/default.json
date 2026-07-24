@@ -1,6 +1,6 @@
 {
   "id": "default",
-  "name": "Add Health Endpoint Feature",
+  "name": "New Workflow",
   "maxAttempts": 3,
   "nodes": [
     {
