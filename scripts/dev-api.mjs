@@ -17,7 +17,7 @@ if (!existsSync(venvPython)) {
   process.exit(1);
 }
 
-const port = process.env.LOOPFORGE_API_PORT || "8001";
+const port = process.env.LOOPFORGE_API_PORT || "8000";
 
 const child = spawn(
   venvPython,
