@@ -1,7 +1,7 @@
 {
   "files": {
     "package.json": {
-      "mtime": 1784882378.4886458,
+      "mtime": 1784882432.1800895,
       "chunks": [
         {
           "text": "{\n  \"name\": \"demo-repo\",\n  \"version\": \"1.0.0\",\n  \"main\": \"index.js\",\n  \"directories\": {\n    \"test\": \"test\"\n  },\n  \"scripts\": {\n    \"test\": \"node --test\"\n  },\n  \"keywords\": [],\n  \"author\": \"\",\n  \"license\": \"ISC\",\n  \"description\": \"\",\n  \"type\": \"module\"\n}",
@@ -1547,7 +1547,7 @@
       ]
     },
     "src/app.js": {
-      "mtime": 1784887904.0914958,
+      "mtime": 1784882432.209602,
       "chunks": [
         {
           "text": "import http from \"node:http\";\n\n/**\n * Tiny demo API \u2014 includes /health for the coding-loop demo.\n */\nexport function createApp() {\n  return http.createServer((req, res) => {\n    if (req.url === \"/\" && req.method === \"GET\") {\n      res.writeHead(200, { \"Content-Type\": \"application/json\" });\n      res.end(JSON.stringify({ name: \"demo-api\", status: \"ok\" }));\n      return;\n    }\n\n    if (req.url === \"/health\" && req.method === \"GET\") {\n      res.writeHead(200, { \"Content-Type\": \"application/json\" });\n      res.end(JSON.stringify({ status: \"healthy\" }));\n      return;\n    }\n\n    res.writeHead(404, { \"Content-Type\": \"application/json\" });",
@@ -4634,7 +4634,7 @@
       ]
     },
     "test/app.test.js": {
-      "mtime": 1784882378.4906478,
+      "mtime": 1784882432.234161,
       "chunks": [
         {
           "text": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\nimport { startServer } from \"../src/app.js\";\n\nasync function get(port, path) {\n  const res = await fetch(`http://127.0.0.1:${port}${path}`);\n  const body = await res.json();\n  return { status: res.status, body };\n}\n\ntest(\"GET / returns ok\", async () => {\n  const { server, port } = await startServer();\n  try {\n    const { status, body } = await get(port, \"/\");\n    assert.equal(status, 200);\n    assert.equal(body.status, \"ok\");\n  } finally {\n    server.close();\n  }\n});\n\ntest(\"GET /health returns healthy\", async () => {\n  const { server, port } = await startServer();",

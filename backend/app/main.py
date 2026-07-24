@@ -145,7 +145,7 @@ def get_codebase_search(
     
     try:
         from app.orchestrator.search import hybrid_search
-        results = hybrid_search(repo_dir, index_file, query, top_k)
+        results, _ = hybrid_search(repo_dir, index_file, query, top_k)
         serializable = []
         for r in results:
             serializable.append({

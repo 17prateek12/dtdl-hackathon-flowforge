@@ -20,5 +20,44 @@ body {
 
 .react-flow__node {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  overflow: visible !important;
+}
+
+.react-flow__handle {
+  opacity: 0.85;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.react-flow__handle:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.react-flow__edge-textbg {
+  rx: 4;
+  ry: 4;
+}
+
+.react-flow__controls {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 4px 12px rgb(15 23 42 / 0.06);
+}
+
+.react-flow__controls-button {
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+  fill: #64748b;
+}
+
+.react-flow__controls-button:hover {
+  background: #f8fafc;
 }
 

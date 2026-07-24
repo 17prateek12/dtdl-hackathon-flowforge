@@ -86,7 +86,7 @@ export interface ConsoleEvent {
 
 export interface FileChange {
   path: string;
-  action: "created" | "modified" | "deleted";
+  action: "created" | "modified" | "deleted" | "verified";
   linesAdded?: number;
   linesRemoved?: number;
 }

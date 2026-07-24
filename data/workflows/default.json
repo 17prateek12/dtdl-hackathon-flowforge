@@ -1,503 +1,503 @@
 {
-    "id":  "default",
-    "name":  "Default Coding Loop",
-    "maxAttempts":  3,
-    "nodes":  [
-                  {
-                      "id":  "input",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  40.0,
-                                       "y":  180.0
-                                   },
-                      "data":  {
-                                   "label":  "Coding Objective",
-                                   "description":  "Objective and constraints",
-                                   "nodeType":  "input",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  "",
-                                   "constraints":  "",
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "criteria",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  280.0,
-                                       "y":  80.0
-                                   },
-                      "data":  {
-                                   "label":  "Success Criteria Agent",
-                                   "description":  "Generate measurable success criteria",
-                                   "nodeType":  "agent",
-                                   "role":  "successCriteria",
-                                   "instructions":  "Give the student portal app where they can see marks",
-                                   "model":  "gpt-4o-mini",
-                                   "tools":  [
-                                                 "Repo Reader",
-                                                 "Search"
-                                             ],
-                                   "maxRetries":  2,
-                                   "timeout":  300,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "gate-criteria",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  540.0,
-                                       "y":  80.0
-                                   },
-                      "data":  {
-                                   "label":  "Human Gate (Review)",
-                                   "description":  "Review and approve success criteria",
-                                   "nodeType":  "humanGate",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "planning",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  280.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Planning Agent",
-                                   "description":  "Create / revise implementation plan",
-                                   "nodeType":  "agent",
-                                   "role":  "planning",
-                                   "instructions":  "Create or revise a concrete implementation plan grounded in real files in the repository. Name modules, order of work, and risks.",
-                                   "model":  "gpt-4o-mini",
-                                   "tools":  [
-                                                 "Repo Reader",
-                                                 "Search"
-                                             ],
-                                   "maxRetries":  2,
-                                   "timeout":  300,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "execution",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  540.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Execution Agent",
-                                   "description":  "Implement changes in the codebase",
-                                   "nodeType":  "agent",
-                                   "role":  "execution",
-                                   "instructions":  "Implement the planned changes in the repository. Follow coding standards and existing patterns. Prefer minimal diffs.",
-                                   "model":  "gpt-4o-mini",
-                                   "tools":  [
-                                                 "File Editor",
-                                                 "Search",
-                                                 "Git",
-                                                 "Terminal"
-                                             ],
-                                   "maxRetries":  2,
-                                   "timeout":  300,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "command",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  800.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Run Tests",
-                                   "description":  "npm test",
-                                   "nodeType":  "command",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  120,
-                                   "command":  "npm test",
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "validation",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  1060.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Validation Agent",
-                                   "description":  "Validate changes and provide evidence",
-                                   "nodeType":  "validator",
-                                   "role":  "validation",
-                                   "instructions":  "Summarize validation evidence. Do not override deterministic check results.",
-                                   "model":  "gpt-4o-mini",
-                                   "tools":  null,
-                                   "maxRetries":  1,
-                                   "timeout":  120,
-                                   "command":  null,
-                                   "fileChecks":  [
-                                                      "src/app.js"
-                                                  ],
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "decision",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  1320.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Decision",
-                                   "description":  "Pass / Fail?",
-                                   "nodeType":  "decision",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "gate-final",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  1320.0,
-                                       "y":  80.0
-                                   },
-                      "data":  {
-                                   "label":  "Human Gate (Approve)",
-                                   "description":  "Approve completion",
-                                   "nodeType":  "humanGate",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "success",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  1580.0,
-                                       "y":  40.0
-                                   },
-                      "data":  {
-                                   "label":  "Success",
-                                   "description":  "Task Successful",
-                                   "nodeType":  "success",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "stop",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  1580.0,
-                                       "y":  200.0
-                                   },
-                      "data":  {
-                                   "label":  "Stop",
-                                   "description":  "Stopped Safely",
-                                   "nodeType":  "stop",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  },
-                  {
-                      "id":  "gate-plan",
-                      "type":  "loopNode",
-                      "position":  {
-                                       "x":  410.0,
-                                       "y":  280.0
-                                   },
-                      "data":  {
-                                   "label":  "Review \u0026 Approve Plan",
-                                   "description":  "Approve architecture and steps",
-                                   "nodeType":  "humanGate",
-                                   "role":  null,
-                                   "instructions":  null,
-                                   "model":  null,
-                                   "tools":  null,
-                                   "maxRetries":  null,
-                                   "timeout":  null,
-                                   "command":  null,
-                                   "fileChecks":  null,
-                                   "objective":  null,
-                                   "constraints":  null,
-                                   "targetRepo":  null,
-                                   "mainTargetFile":  null,
-                                   "targetFiles":  null,
-                                   "validateCommand":  null
-                               }
-                  }
-              ],
-    "edges":  [
-                  {
-                      "id":  "e-input-criteria",
-                      "source":  "input",
-                      "target":  "criteria",
-                      "sourceHandle":  null,
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-criteria-gate",
-                      "source":  "criteria",
-                      "target":  "gate-criteria",
-                      "sourceHandle":  "success",
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-gate-planning",
-                      "source":  "gate-criteria",
-                      "target":  "planning",
-                      "sourceHandle":  "approve",
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-gate-stop1",
-                      "source":  "gate-criteria",
-                      "target":  "stop",
-                      "sourceHandle":  "reject",
-                      "targetHandle":  null,
-                      "label":  "reject",
-                      "style":  {
-                                    "stroke":  "#ef4444",
-                                    "strokeDasharray":  "6 4"
-                                },
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-planning-gate-plan",
-                      "source":  "planning",
-                      "target":  "gate-plan",
-                      "sourceHandle":  "success",
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-gate-plan-exec",
-                      "source":  "gate-plan",
-                      "target":  "execution",
-                      "sourceHandle":  "approve",
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-gate-plan-stop",
-                      "source":  "gate-plan",
-                      "target":  "stop",
-                      "sourceHandle":  "reject",
-                      "targetHandle":  null,
-                      "label":  "reject",
-                      "style":  {
-                                    "stroke":  "#ef4444",
-                                    "strokeDasharray":  "6 4"
-                                },
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-exec-cmd",
-                      "source":  "execution",
-                      "target":  "command",
-                      "sourceHandle":  null,
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-cmd-val",
-                      "source":  "command",
-                      "target":  "validation",
-                      "sourceHandle":  null,
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-val-decision",
-                      "source":  "validation",
-                      "target":  "decision",
-                      "sourceHandle":  null,
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  null,
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-decision-fail",
-                      "source":  "decision",
-                      "target":  "planning",
-                      "sourceHandle":  "fail",
-                      "targetHandle":  null,
-                      "label":  "fail â†’ retry",
-                      "style":  {
-                                    "stroke":  "#ef4444",
-                                    "strokeDasharray":  "6 4"
-                                },
-                      "animated":  true
-                  },
-                  {
-                      "id":  "e-decision-pass",
-                      "source":  "decision",
-                      "target":  "gate-final",
-                      "sourceHandle":  "pass",
-                      "targetHandle":  null,
-                      "label":  "pass",
-                      "style":  {
-                                    "stroke":  "#22c55e",
-                                    "strokeDasharray":  "6 4"
-                                },
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-final-success",
-                      "source":  "gate-final",
-                      "target":  "success",
-                      "sourceHandle":  "approve",
-                      "targetHandle":  null,
-                      "label":  null,
-                      "style":  {
-                                    "stroke":  "#22c55e"
-                                },
-                      "animated":  null
-                  },
-                  {
-                      "id":  "e-final-stop",
-                      "source":  "gate-final",
-                      "target":  "stop",
-                      "sourceHandle":  "reject",
-                      "targetHandle":  null,
-                      "label":  "reject",
-                      "style":  {
-                                    "stroke":  "#ef4444",
-                                    "strokeDasharray":  "6 4"
-                                },
-                      "animated":  null
-                  }
-              ]
+  "id": "default",
+  "name": "Default Coding Loop",
+  "maxAttempts": 3,
+  "nodes": [
+    {
+      "id": "input",
+      "type": "loopNode",
+      "position": {
+        "x": 80.0,
+        "y": 400.0
+      },
+      "data": {
+        "label": "Coding Objective",
+        "description": "Objective and constraints",
+        "nodeType": "input",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": "",
+        "constraints": "",
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "criteria",
+      "type": "loopNode",
+      "position": {
+        "x": 460.0,
+        "y": 100.0
+      },
+      "data": {
+        "label": "Success Criteria Agent",
+        "description": "Generate measurable success criteria",
+        "nodeType": "agent",
+        "role": "successCriteria",
+        "instructions": "Give the student portal app where they can see marks",
+        "model": "gpt-4o-mini",
+        "tools": [
+          "Repo Reader",
+          "Search"
+        ],
+        "maxRetries": 2,
+        "timeout": 300,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "gate-criteria",
+      "type": "loopNode",
+      "position": {
+        "x": 840.0,
+        "y": 100.0
+      },
+      "data": {
+        "label": "Human Gate (Review)",
+        "description": "Review and approve success criteria",
+        "nodeType": "humanGate",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "planning",
+      "type": "loopNode",
+      "position": {
+        "x": 460.0,
+        "y": 400.0
+      },
+      "data": {
+        "label": "Planning Agent",
+        "description": "Create / revise implementation plan",
+        "nodeType": "agent",
+        "role": "planning",
+        "instructions": "Create or revise a concrete implementation plan grounded in real files in the repository. Name modules, order of work, and risks.",
+        "model": "gpt-4o-mini",
+        "tools": [
+          "Repo Reader",
+          "Search"
+        ],
+        "maxRetries": 2,
+        "timeout": 300,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "execution",
+      "type": "loopNode",
+      "position": {
+        "x": 1200.0,
+        "y": 400.0
+      },
+      "data": {
+        "label": "Execution Agent",
+        "description": "Implement changes in the codebase",
+        "nodeType": "agent",
+        "role": "execution",
+        "instructions": "Implement the planned changes in the repository. Follow coding standards and existing patterns. Prefer minimal diffs.",
+        "model": "gpt-4o-mini",
+        "tools": [
+          "File Editor",
+          "Search",
+          "Git",
+          "Terminal"
+        ],
+        "maxRetries": 2,
+        "timeout": 300,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "command",
+      "type": "loopNode",
+      "position": {
+        "x": 1520.0,
+        "y": 400.0
+      },
+      "data": {
+        "label": "Run Tests",
+        "description": "npm test",
+        "nodeType": "command",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": 120,
+        "command": "npm test",
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "validation",
+      "type": "loopNode",
+      "position": {
+        "x": 1520.0,
+        "y": 700.0
+      },
+      "data": {
+        "label": "Validation Agent",
+        "description": "Validate changes and provide evidence",
+        "nodeType": "validator",
+        "role": "validation",
+        "instructions": "Summarize validation evidence. Do not override deterministic check results.",
+        "model": "gpt-4o-mini",
+        "tools": null,
+        "maxRetries": 1,
+        "timeout": 120,
+        "command": null,
+        "fileChecks": [
+          "src/app.js"
+        ],
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "decision",
+      "type": "loopNode",
+      "position": {
+        "x": 1200.0,
+        "y": 700.0
+      },
+      "data": {
+        "label": "Decision",
+        "description": "Pass / Fail?",
+        "nodeType": "decision",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "gate-final",
+      "type": "loopNode",
+      "position": {
+        "x": 840.0,
+        "y": 700.0
+      },
+      "data": {
+        "label": "Human Gate (Approve)",
+        "description": "Approve completion",
+        "nodeType": "humanGate",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "success",
+      "type": "loopNode",
+      "position": {
+        "x": 460.0,
+        "y": 700.0
+      },
+      "data": {
+        "label": "Success",
+        "description": "Task Successful",
+        "nodeType": "success",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "stop",
+      "type": "loopNode",
+      "position": {
+        "x": 1280.0,
+        "y": 100.0
+      },
+      "data": {
+        "label": "Stop",
+        "description": "Stopped Safely",
+        "nodeType": "stop",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    },
+    {
+      "id": "gate-plan",
+      "type": "loopNode",
+      "position": {
+        "x": 840.0,
+        "y": 400.0
+      },
+      "data": {
+        "label": "Review & Approve Plan",
+        "description": "Approve architecture and steps",
+        "nodeType": "humanGate",
+        "role": null,
+        "instructions": null,
+        "model": null,
+        "tools": null,
+        "maxRetries": null,
+        "timeout": null,
+        "command": null,
+        "fileChecks": null,
+        "objective": null,
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-input-criteria",
+      "source": "input",
+      "target": "criteria",
+      "sourceHandle": null,
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-criteria-gate",
+      "source": "criteria",
+      "target": "gate-criteria",
+      "sourceHandle": "success",
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-planning",
+      "source": "gate-criteria",
+      "target": "planning",
+      "sourceHandle": "approve",
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-stop1",
+      "source": "gate-criteria",
+      "target": "stop",
+      "sourceHandle": "reject",
+      "targetHandle": null,
+      "label": "reject",
+      "style": {
+        "stroke": "#ef4444",
+        "strokeDasharray": "6 4"
+      },
+      "animated": null
+    },
+    {
+      "id": "e-planning-gate-plan",
+      "source": "planning",
+      "target": "gate-plan",
+      "sourceHandle": "success",
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-plan-exec",
+      "source": "gate-plan",
+      "target": "execution",
+      "sourceHandle": "approve",
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-gate-plan-stop",
+      "source": "gate-plan",
+      "target": "stop",
+      "sourceHandle": "reject",
+      "targetHandle": null,
+      "label": "reject",
+      "style": {
+        "stroke": "#ef4444",
+        "strokeDasharray": "6 4"
+      },
+      "animated": null
+    },
+    {
+      "id": "e-exec-cmd",
+      "source": "execution",
+      "target": "command",
+      "sourceHandle": null,
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-cmd-val",
+      "source": "command",
+      "target": "validation",
+      "sourceHandle": null,
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-val-decision",
+      "source": "validation",
+      "target": "decision",
+      "sourceHandle": null,
+      "targetHandle": null,
+      "label": null,
+      "style": null,
+      "animated": null
+    },
+    {
+      "id": "e-decision-fail",
+      "source": "decision",
+      "target": "planning",
+      "sourceHandle": "fail",
+      "targetHandle": null,
+      "label": "fail â†’ retry",
+      "style": {
+        "stroke": "#ef4444",
+        "strokeDasharray": "6 4"
+      },
+      "animated": true
+    },
+    {
+      "id": "e-decision-pass",
+      "source": "decision",
+      "target": "gate-final",
+      "sourceHandle": "pass",
+      "targetHandle": null,
+      "label": "pass",
+      "style": {
+        "stroke": "#22c55e",
+        "strokeDasharray": "6 4"
+      },
+      "animated": null
+    },
+    {
+      "id": "e-final-success",
+      "source": "gate-final",
+      "target": "success",
+      "sourceHandle": "approve",
+      "targetHandle": null,
+      "label": null,
+      "style": {
+        "stroke": "#22c55e"
+      },
+      "animated": null
+    },
+    {
+      "id": "e-final-stop",
+      "source": "gate-final",
+      "target": "stop",
+      "sourceHandle": "reject",
+      "targetHandle": null,
+      "label": "reject",
+      "style": {
+        "stroke": "#ef4444",
+        "strokeDasharray": "6 4"
+      },
+      "animated": null
+    }
+  ]
 }

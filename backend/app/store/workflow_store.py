@@ -16,7 +16,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "input",
             "type": "loopNode",
-            "position": {"x": 40, "y": 180},
+            "position": {"x": 80, "y": 400},
             "data": {
                 "label": "Coding Objective",
                 "description": "Objective and constraints",
@@ -31,7 +31,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "criteria",
             "type": "loopNode",
-            "position": {"x": 280, "y": 80},
+            "position": {"x": 460, "y": 100},
             "data": {
                 "label": "Success Criteria Agent",
                 "description": "Generate measurable success criteria",
@@ -50,7 +50,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "gate-criteria",
             "type": "loopNode",
-            "position": {"x": 540, "y": 80},
+            "position": {"x": 840, "y": 100},
             "data": {
                 "label": "Human Gate (Review)",
                 "description": "Review and approve success criteria",
@@ -60,7 +60,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "planning",
             "type": "loopNode",
-            "position": {"x": 280, "y": 280},
+            "position": {"x": 460, "y": 400},
             "data": {
                 "label": "Planning Agent",
                 "description": "Create / revise implementation plan",
@@ -77,9 +77,19 @@ DEFAULT_WORKFLOW: dict = {
             },
         },
         {
+            "id": "gate-plan",
+            "type": "loopNode",
+            "position": {"x": 840, "y": 400},
+            "data": {
+                "label": "Review & Approve Plan",
+                "description": "Approve architecture and steps",
+                "nodeType": "humanGate",
+            },
+        },
+        {
             "id": "execution",
             "type": "loopNode",
-            "position": {"x": 540, "y": 280},
+            "position": {"x": 1200, "y": 400},
             "data": {
                 "label": "Execution Agent",
                 "description": "Implement changes in the codebase",
@@ -98,7 +108,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "command",
             "type": "loopNode",
-            "position": {"x": 800, "y": 280},
+            "position": {"x": 1520, "y": 400},
             "data": {
                 "label": "Run Tests",
                 "description": "npm test",
@@ -110,7 +120,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "validation",
             "type": "loopNode",
-            "position": {"x": 1060, "y": 280},
+            "position": {"x": 1520, "y": 700},
             "data": {
                 "label": "Validation Agent",
                 "description": "Validate changes and provide evidence",
@@ -129,7 +139,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "decision",
             "type": "loopNode",
-            "position": {"x": 1320, "y": 280},
+            "position": {"x": 1200, "y": 700},
             "data": {
                 "label": "Decision",
                 "description": "Pass / Fail?",
@@ -139,7 +149,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "gate-final",
             "type": "loopNode",
-            "position": {"x": 1320, "y": 80},
+            "position": {"x": 840, "y": 700},
             "data": {
                 "label": "Human Gate (Approve)",
                 "description": "Approve completion",
@@ -149,7 +159,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "success",
             "type": "loopNode",
-            "position": {"x": 1580, "y": 40},
+            "position": {"x": 460, "y": 700},
             "data": {
                 "label": "Success",
                 "description": "Task Successful",
@@ -159,7 +169,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "stop",
             "type": "loopNode",
-            "position": {"x": 1580, "y": 200},
+            "position": {"x": 1280, "y": 100},
             "data": {
                 "label": "Stop",
                 "description": "Stopped Safely",
@@ -189,7 +199,26 @@ DEFAULT_WORKFLOW: dict = {
             "label": "reject",
             "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
         },
-        {"id": "e-planning-exec", "source": "planning", "target": "execution"},
+        {
+            "id": "e-planning-gate-plan",
+            "source": "planning",
+            "target": "gate-plan",
+            "sourceHandle": "success",
+        },
+        {
+            "id": "e-gate-plan-exec",
+            "source": "gate-plan",
+            "target": "execution",
+            "sourceHandle": "approve",
+        },
+        {
+            "id": "e-gate-plan-stop",
+            "source": "gate-plan",
+            "target": "stop",
+            "sourceHandle": "reject",
+            "label": "reject",
+            "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
+        },
         {"id": "e-exec-cmd", "source": "execution", "target": "command"},
         {"id": "e-cmd-val", "source": "command", "target": "validation"},
         {"id": "e-val-decision", "source": "validation", "target": "decision"},

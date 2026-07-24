@@ -89,7 +89,7 @@ class ConsoleEvent(BaseModel):
 
 class FileChange(BaseModel):
     path: str
-    action: Literal["created", "modified", "deleted"]
+    action: Literal["created", "modified", "deleted", "verified"]
     linesAdded: Optional[int] = None
     linesRemoved: Optional[int] = None
 

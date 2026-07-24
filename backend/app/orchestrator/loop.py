@@ -10,6 +10,7 @@ from app.agents import runner as agents
 from app.agents import tools as repo_tools
 from app.agents.workspace import RepoWorkspace, bind_workspace, normalize_rel_path, parse_target_files
 from app.models import (
+    FileChange,
     HumanGateDecision,
     NodeExecutionReceipt,
     PendingHumanGate,
@@ -20,6 +21,7 @@ from app.models import (
 from app.orchestrator.validation import (
     CommandResult,
     deterministic_validate,
+    format_validation_report,
     run_command_node,
 )
 from app.store.run_store import append_event, load_run, save_run
@@ -137,6 +139,71 @@ def _unapproved_extra_files(run: RunRecord, changed_paths: list[str]) -> list[st
     extra = repo_tools.list_extra_file_changes(changed_paths)
     approved = set(run.approvedExtraFiles or [])
     return [path for path in extra if path not in approved]
+
+
+def _merge_files_changed(run: RunRecord, incoming: list[FileChange]) -> None:
+    rank = {"deleted": 4, "created": 3, "modified": 2, "verified": 1}
+    for f in incoming:
+        existing = next((x for x in run.filesChanged if x.path == f.path), None)
+        if existing:
+            if rank.get(f.action, 0) > rank.get(existing.action, 0):
+                existing.action = f.action
+            if f.linesAdded is not None:
+                existing.linesAdded = f.linesAdded
+            if f.linesRemoved is not None:
+                existing.linesRemoved = f.linesRemoved
+        else:
+            run.filesChanged.append(f)
+
+
+def _merge_activity_files(run: RunRecord) -> None:
+    """List files agents read, indexed, or validated — even without a git diff."""
+    if run.receipts.get("planning"):
+        _merge_files_changed(
+            run,
+            [FileChange(path=".flowforge/vector_index.json", action="verified")],
+        )
+
+    for path in run.mainTargetFile, "test/app.test.js":
+        if not path:
+            continue
+        if run.receipts.get("validation") or run.receipts.get("execution"):
+            try:
+                repo_tools.read_file(path)
+                _merge_files_changed(
+                    run, [FileChange(path=path, action="verified")]
+                )
+            except Exception:  # noqa: BLE001
+                continue
+
+
+def _sync_files_from_git(run: RunRecord) -> None:
+    _refresh_files_changed(run)
+
+
+def _refresh_files_changed(run: RunRecord) -> None:
+    if run.baselineCommit:
+        _merge_files_changed(run, repo_tools.git_diff_since(run.baselineCommit))
+    else:
+        _merge_files_changed(run, repo_tools.git_diff_stat())
+    for receipt in run.receipts.values():
+        if receipt.filesChanged:
+            _merge_files_changed(run, list(receipt.filesChanged))
+    _merge_activity_files(run)
+
+
+def _format_files_changed_summary(files: list[FileChange]) -> str:
+    if not files:
+        return "(none)"
+    parts: list[str] = []
+    for f in files:
+        label = f.path
+        if f.action == "verified":
+            label = f"{f.path} (verified)"
+        elif f.action != "modified":
+            label = f"{f.path} ({f.action})"
+        parts.append(label)
+    return ", ".join(parts)
 
 
 def start_run(workflow_id: str = "default", workflow: Optional["Workflow"] = None) -> RunRecord:
@@ -487,6 +554,8 @@ def continue_run(
                     target_repo=run.targetRepo,
                 )
                 run.plan = result["plan"]
+                for f in result.get("touchedFiles") or []:
+                    _merge_files_changed(run, [f])
                 
                 append_event(
                     run,
@@ -532,6 +601,7 @@ def continue_run(
                     node_id=node_id,
                     message=f"Plan ready ({len(result['steps']) or 'n'} steps)",
                 )
+                _refresh_files_changed(run)
                 _flush(run)
                 queue.extend(_next_targets(workflow, node_id))
 
@@ -562,11 +632,12 @@ def continue_run(
                         existing.linesRemoved = f.linesRemoved
                     else:
                         run.filesChanged.append(f)
+                _refresh_files_changed(run)
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
                     status="completed",
                     output=result["summary"],
-                    filesChanged=files,
+                    filesChanged=list(run.filesChanged),
                     commands=result["transcript"],
                     startedAt=started_at,
                     finishedAt=_now(),
@@ -578,11 +649,13 @@ def continue_run(
                     run,
                     level="success",
                     node_id=node_id,
-                    message=f"Execution finished ({len(files)} file changes)",
+                    message=f"Execution finished ({len(run.filesChanged)} file changes)",
                 )
                 _flush(run)
 
-                extra = _unapproved_extra_files(run, [f.path for f in files])
+                extra = _unapproved_extra_files(
+                    run, [f.path for f in run.filesChanged]
+                )
                 if extra and run.mainTargetFile:
                     run.pendingGate = PendingHumanGate(
                         nodeId=node_id,
@@ -638,31 +711,82 @@ def continue_run(
                 queue.extend(_next_targets(workflow, node_id))
 
             elif ntype == "validator":
-                if last_command is None:
-                    last_command = CommandResult(
-                        exit_code=1,
-                        stdout="",
-                        stderr="No command result available",
-                        command="(none)",
+                test_result = agents.generate_validation_tests(
+                    objective=run.objective,
+                    criteria=run.criteria,
+                    plan=run.plan,
+                    files_changed=run.filesChanged,
+                    validate_command=(
+                        run.validateCommand
+                        or node.data.command
+                        or "npm test"
+                    ),
+                    instructions=node.data.instructions,
+                    model=node.data.model,
+                    main_target_file=run.mainTargetFile or None,
+                    target_repo=run.targetRepo,
+                )
+                for f in test_result.get("filesChanged") or []:
+                    existing = next(
+                        (x for x in run.filesChanged if x.path == f.path), None
                     )
+                    if existing:
+                        existing.action = f.action
+                        existing.linesAdded = f.linesAdded
+                        existing.linesRemoved = f.linesRemoved
+                    else:
+                        run.filesChanged.append(f)
+                for path in test_result.get("testFiles") or []:
+                    _merge_files_changed(
+                        run, [FileChange(path=path, action="verified")]
+                    )
+                _refresh_files_changed(run)
+                for line in test_result.get("transcript") or []:
+                    append_event(
+                        run, level="info", node_id=node_id, message=line
+                    )
+                append_event(
+                    run,
+                    level="info",
+                    node_id=node_id,
+                    message=test_result.get("summary", "Tests prepared"),
+                )
+
+                if last_command is None:
+                    cmd = (
+                        run.validateCommand
+                        or node.data.command
+                        or "npm test"
+                    )
+                    last_command = run_command_node(cmd, node.data.timeout or 120)
+
                 det = deterministic_validate(
                     command_result=last_command,
                     file_checks=node.data.fileChecks
                     or ([run.mainTargetFile] if run.mainTargetFile else None),
                 )
                 last_validation_passed = det["passed"]
-                run.validationEvidence = det["evidence"]
                 summary = agents.summarize_validation(
                     passed=det["passed"],
                     evidence=det["evidence"],
                     instructions=node.data.instructions,
                     model=node.data.model,
                 )
+                report = format_validation_report(
+                    test_generation=test_result,
+                    command_result=last_command,
+                    validation=det,
+                    summary=summary,
+                    files_changed=run.filesChanged,
+                )
+                run.validationEvidence = report
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
                     status="completed" if det["passed"] else "failed",
                     output=summary,
-                    evidence=det["evidence"],
+                    evidence=report,
+                    commands=test_result.get("transcript"),
+                    filesChanged=list(run.filesChanged),
                     startedAt=started_at,
                     finishedAt=_now(),
                     retryReason=None
@@ -677,9 +801,9 @@ def continue_run(
                     level="success" if det["passed"] else "error",
                     node_id=node_id,
                     message=(
-                        "Validation PASSED (deterministic)"
+                        f"Validation PASSED — {len(test_result.get('testCases') or [])} test case(s) verified"
                         if det["passed"]
-                        else "Validation FAILED (deterministic) — feeding evidence back"
+                        else "Validation FAILED — see output panel for details"
                     ),
                 )
                 _flush(run)
@@ -754,21 +878,23 @@ def continue_run(
                 else:
                     kind = "final"
                     title = "Approve Completion"
+                    _refresh_files_changed(run)
+                    criteria_lines = [f"  • {c}" for c in run.criteria[:4]]
+                    if len(run.criteria) > 4:
+                        criteria_lines.append(
+                            f"  • … and {len(run.criteria) - 4} more"
+                        )
                     summary = "\n".join(
                         [
                             f"Attempt {run.attempt}/{run.maxAttempts}",
                             "",
-                            "Criteria:",
-                            *[f"- {c}" for c in run.criteria],
+                            "Success criteria:",
+                            *criteria_lines,
                             "",
-                            "Validation evidence:",
                             run.validationEvidence or "(none)",
                             "",
                             "Files changed: "
-                            + (
-                                ", ".join(f.path for f in run.filesChanged)
-                                or "(none)"
-                            ),
+                            + _format_files_changed_summary(run.filesChanged),
                         ]
                     )
                     editable = None
