@@ -401,17 +401,59 @@ function WorkbenchInner() {
     window.open("/api/workflows?format=yaml", "_blank");
   };
 
-  const startRun = async () => {
+  const resetWorkflow = async () => {
+    if (!workflow) return;
+    const ok = window.confirm(
+      "Reset this workflow to the default template? Any node edits " +
+      "(instructions, objective, constraints, etc.) will be discarded.",
+    );
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
-      await saveWorkflow();
+      const res = await fetch(
+        `/api/workflows/reset?id=${encodeURIComponent(workflow.id)}`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error("Failed to reset workflow");
+      const restored = (await res.json()) as Workflow;
+      setWorkflow(restored);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startRun = async () => {
+    // Guard: objective must be set before running
+    const inputNode = workflow?.nodes.find((n) => n.id === "input");
+    const objective = (inputNode?.data?.objective ?? "").trim();
+    if (!objective) {
+      setError(
+        "Please fill in the Coding Objective in the Input node before running."
+      );
+      setSelectedId("input");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      // Send the full live workflow inline — backend uses it directly,
+      // no disk read, so user edits are always reflected immediately.
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workflowId: workflow?.id || "default" }),
+        body: JSON.stringify({
+          workflowId: workflow?.id || "default",
+          workflow: workflow,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to start run");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.detail ?? "Failed to start run");
+      }
       const next = (await res.json()) as RunRecord;
       setRun(next);
       setConsoleCollapsed(false);
@@ -470,11 +512,11 @@ function WorkbenchInner() {
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    
+
     try {
       const data = e.dataTransfer.getData("application/json");
       if (!data) return;
-      
+
       const { type } = JSON.parse(data) as { type: NodeType };
       if (!type || !workflow) return;
 
@@ -485,7 +527,7 @@ function WorkbenchInner() {
 
       // Generate unique ID for the new node
       const nodeId = `${type}-${Date.now()}`;
-      
+
       // Create default node data based on type
       const nodeData: WorkflowNode["data"] = {
         label: type.charAt(0).toUpperCase() + type.slice(1),
@@ -558,6 +600,15 @@ function WorkbenchInner() {
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
           >
             Save
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetWorkflow()}
+            disabled={busy || !workflow}
+            title="Restore this workflow to the default template, discarding node edits"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Reset
           </button>
           <button
             type="button"

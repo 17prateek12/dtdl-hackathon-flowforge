@@ -5,6 +5,9 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
+# Ensure .env is loaded before reading any env vars (paths.py calls load_dotenv)
+import app.paths  # noqa: F401
+
 
 @dataclass
 class ModelOption:
@@ -70,7 +73,8 @@ def any_provider_configured() -> bool:
 
 
 def use_mock() -> bool:
-    if _truthy("MOCK_AGENTS", "true"):
+    # Default is FALSE — real LLM is used unless MOCK_AGENTS=true is explicitly set
+    if _truthy("MOCK_AGENTS", "false"):
         return True
     return not any_provider_configured()
 

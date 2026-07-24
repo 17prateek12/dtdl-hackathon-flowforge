@@ -139,9 +139,18 @@ def _unapproved_extra_files(run: RunRecord, changed_paths: list[str]) -> list[st
     return [path for path in extra if path not in approved]
 
 
-def start_run(workflow_id: str = "default") -> RunRecord:
-    workflow = load_workflow(workflow_id)
+def start_run(workflow_id: str = "default", workflow: Optional["Workflow"] = None) -> RunRecord:
+    from app.models import Workflow as WorkflowModel
+    if workflow is None:
+        workflow = load_workflow(workflow_id)
     input_node = _find_node(workflow, "input")
+
+    objective = (input_node.data.objective or "").strip()
+    if not objective:
+        raise ValueError(
+            "No objective provided. Please fill in the 'Coding Objective' field in the Input node before running."
+        )
+
     main_target = _resolve_main_target(input_node)
 
     workspace = RepoWorkspace.create(

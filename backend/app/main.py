@@ -12,6 +12,7 @@ from app.store.workflow_store import (
     export_workflow_yaml,
     load_workflow,
     save_workflow,
+    reset_workflow
 )
 
 app = FastAPI(
@@ -70,6 +71,14 @@ def post_workflow(body: Workflow) -> Workflow:
     return save_workflow(body)
 
 
+@app.post("/api/workflows/reset")
+def post_workflow_reset(id: str = Query("default")) -> Workflow:
+    """Restore this workflow to the in-code default template. Use this to
+    recover from stray node edits (e.g. test instructions typed into a node)
+    that got auto-saved over the canonical template by a Run click."""
+    return reset_workflow(id)
+
+
 @app.get("/api/runs")
 def get_runs():
     return list_runs()
@@ -78,7 +87,11 @@ def get_runs():
 @app.post("/api/runs")
 def post_run(body: StartRunBody | None = None):
     workflow_id = (body.workflowId if body else None) or "default"
-    return start_run(workflow_id)
+    inline_workflow = body.workflow if body else None
+    try:
+        return start_run(workflow_id, workflow=inline_workflow)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/runs/{run_id}")

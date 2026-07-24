@@ -153,3 +153,4 @@ class HumanGateDecision(BaseModel):
 
 class StartRunBody(BaseModel):
     workflowId: str = "default"
+    workflow: Optional["Workflow"] = None  # if provided, used directly instead of reading from disk
