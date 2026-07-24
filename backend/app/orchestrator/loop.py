@@ -139,9 +139,18 @@ def _unapproved_extra_files(run: RunRecord, changed_paths: list[str]) -> list[st
     return [path for path in extra if path not in approved]
 
 
-def start_run(workflow_id: str = "default") -> RunRecord:
-    workflow = load_workflow(workflow_id)
+def start_run(workflow_id: str = "default", workflow: Optional["Workflow"] = None) -> RunRecord:
+    from app.models import Workflow as WorkflowModel
+    if workflow is None:
+        workflow = load_workflow(workflow_id)
     input_node = _find_node(workflow, "input")
+
+    objective = (input_node.data.objective or "").strip()
+    if not objective:
+        raise ValueError(
+            "No objective provided. Please fill in the 'Coding Objective' field in the Input node before running."
+        )
+
     main_target = _resolve_main_target(input_node)
 
     workspace = RepoWorkspace.create(
@@ -258,6 +267,14 @@ def resume_run(run_id: str, decision: HumanGateDecision) -> Optional[RunRecord]:
                 level="info",
                 node_id=gate_id,
                 message=f"Criteria edited ({len(run.criteria)} items)",
+            )
+        elif gate_kind == "plan":
+            run.plan = decision.editedText
+            append_event(
+                run,
+                level="info",
+                node_id=gate_id,
+                message="Architecture Plan edited by human",
             )
 
     if decision.action == "reject":
@@ -434,6 +451,13 @@ def continue_run(
                     target_repo=run.targetRepo,
                 )
                 run.criteria = result["criteria"]
+                for i, c in enumerate(run.criteria):
+                    append_event(
+                        run,
+                        level="info",
+                        node_id=node_id,
+                        message=f"Criterion {i + 1}: {c}",
+                    )
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
                     status="completed",
@@ -463,6 +487,37 @@ def continue_run(
                     target_repo=run.targetRepo,
                 )
                 run.plan = result["plan"]
+                
+                append_event(
+                    run,
+                    level="info",
+                    node_id=node_id,
+                    message="--- Architecture & Design Overview ---",
+                )
+                for line in result["plan"].split("\n"):
+                    trimmed = line.strip()
+                    if trimmed:
+                        append_event(
+                            run,
+                            level="info",
+                            node_id=node_id,
+                            message=trimmed,
+                        )
+                
+                append_event(
+                    run,
+                    level="info",
+                    node_id=node_id,
+                    message="--- Implementation Milestones ---",
+                )
+                for i, step in enumerate(result.get("steps") or []):
+                    append_event(
+                        run,
+                        level="info",
+                        node_id=node_id,
+                        message=f"Step {i + 1}: {step}",
+                    )
+
                 run.receipts[node_id] = NodeExecutionReceipt(
                     nodeId=node_id,
                     status="completed",
@@ -684,13 +739,21 @@ def continue_run(
                     queue.extend(_next_targets(workflow, node_id, "fail"))
 
             elif ntype == "humanGate":
-                kind = "criteria" if node_id == "gate-criteria" else "final"
-                if kind == "criteria":
+                if node_id == "gate-criteria":
+                    kind = "criteria"
+                    title = "Review & Approve Success Criteria"
                     summary = "\n".join(
                         f"{i + 1}. {c}" for i, c in enumerate(run.criteria)
                     )
                     editable = summary
+                elif node_id == "gate-plan":
+                    kind = "plan"
+                    title = "Review & Approve Architecture Plan"
+                    summary = run.plan
+                    editable = run.plan
                 else:
+                    kind = "final"
+                    title = "Approve Completion"
                     summary = "\n".join(
                         [
                             f"Attempt {run.attempt}/{run.maxAttempts}",
@@ -712,11 +775,7 @@ def continue_run(
                 run.pendingGate = PendingHumanGate(
                     nodeId=node_id,
                     kind=kind,
-                    title=(
-                        "Review & Approve Success Criteria"
-                        if kind == "criteria"
-                        else "Approve Completion"
-                    ),
+                    title=title,
                     summary=summary,
                     editableText=editable,
                 )

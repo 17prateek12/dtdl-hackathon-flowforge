@@ -18,7 +18,7 @@ def save_run(run: RunRecord) -> RunRecord:
     _ensure_dirs()
     run.updatedAt = datetime.now(timezone.utc).isoformat()
     _memory[run.id] = run
-    run_path(run.id).write_text(run.model_dump_json(indent=2))
+    run_path(run.id).write_text(run.model_dump_json(indent=2), encoding="utf-8")
     return run
 
 
@@ -28,9 +28,15 @@ def load_run(run_id: str) -> Optional[RunRecord]:
     path = run_path(run_id)
     if not path.exists():
         return None
-    run = RunRecord.model_validate(json.loads(path.read_text()))
-    _memory[run_id] = run
-    return run
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return None
+        run = RunRecord.model_validate(json.loads(content))
+        _memory[run_id] = run
+        return run
+    except Exception:
+        return None
 
 
 def list_runs() -> list[RunRecord]:

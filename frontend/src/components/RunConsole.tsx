@@ -157,6 +157,12 @@ function filterEvents(events: ConsoleEvent[], nodeId: string | null) {
 }
 
 function LogPane({ title, events }: { title: string; events: ConsoleEvent[] }) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [events.length]);
+
   return (
     <div className="scrollbar-hide overflow-auto p-3">
       <div className="mb-3 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
@@ -179,6 +185,7 @@ function LogPane({ title, events }: { title: string; events: ConsoleEvent[] }) {
           ))}
         </ul>
       )}
+      <div ref={endRef} />
     </div>
   );
 }

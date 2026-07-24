@@ -21,17 +21,11 @@ DEFAULT_WORKFLOW: dict = {
                 "label": "Coding Objective",
                 "description": "Objective and constraints",
                 "nodeType": "input",
-                "objective": (
-                    'Add a GET /health endpoint that returns JSON { status: "healthy" } '
-                    "with HTTP 200, and ensure unit tests pass."
-                ),
-                "constraints": (
-                    "Focus changes on the main target file. Other files may be "
-                    "changed if needed, but will require human approval."
-                ),
-                "targetRepo": "demo-repo",
-                "mainTargetFile": "src/app.js",
-                "validateCommand": "npm test",
+                "objective": "",
+                "constraints": "",
+                "targetRepo": None,
+                "mainTargetFile": None,
+                "validateCommand": None,
             },
         },
         {
@@ -243,7 +237,7 @@ def load_workflow(workflow_id: str = "default") -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow_id)
     if path.exists():
-        return Workflow.model_validate(json.loads(path.read_text()))
+        return Workflow.model_validate(json.loads(path.read_text(encoding="utf-8")))
     workflow = Workflow.model_validate(deepcopy(DEFAULT_WORKFLOW))
     save_workflow(workflow)
     return workflow
@@ -252,8 +246,19 @@ def load_workflow(workflow_id: str = "default") -> Workflow:
 def save_workflow(workflow: Workflow) -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow.id)
-    path.write_text(workflow.model_dump_json(indent=2))
+    path.write_text(workflow.model_dump_json(indent=2), encoding="utf-8")
     return workflow
+
+
+def reset_workflow(workflow_id: str = "default") -> Workflow:
+    """Restore a workflow to the in-code default template, discarding any
+    edits that were previously auto-saved over it (e.g. via startRun's
+    save-then-run flow). This is the fix for stray node edits — like a
+    test 'instructions' string typed into a node — silently becoming the
+    permanent seed template on disk."""
+    workflow = Workflow.model_validate(deepcopy(DEFAULT_WORKFLOW))
+    workflow.id = workflow_id
+    return save_workflow(workflow)
 
 
 def export_workflow_yaml(workflow_id: str = "default") -> str:

@@ -2,12 +2,21 @@
 
 import type { WorkflowNode } from "@/lib/types";
 
+export interface ModelOption {
+  id: string;
+  label: string;
+  provider: string;
+  available: boolean;
+  envKey: string;
+}
+
 interface Props {
   node: WorkflowNode | null;
   onChange: (nodeId: string, patch: Partial<WorkflowNode["data"]>) => void;
+  models?: ModelOption[];
 }
 
-export function NodeInspector({ node, onChange }: Props) {
+export function NodeInspector({ node, onChange, models }: Props) {
   if (!node) {
     return (
       <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
@@ -116,11 +125,26 @@ export function NodeInspector({ node, onChange }: Props) {
               />
             </Field>
             <Field label="Model">
-              <input
-                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                value={d.model || ""}
-                onChange={(e) => onChange(node.id, { model: e.target.value })}
-              />
+              {models && models.length > 0 ? (
+                <select
+                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm bg-white"
+                  value={d.model || ""}
+                  onChange={(e) => onChange(node.id, { model: e.target.value })}
+                >
+                  <option value="">(None / Default)</option>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} {!m.available ? " (missing key)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={d.model || ""}
+                  onChange={(e) => onChange(node.id, { model: e.target.value })}
+                />
+              )}
             </Field>
             {d.tools && (
               <Field label="Tools">

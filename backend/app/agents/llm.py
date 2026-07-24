@@ -5,6 +5,9 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
+# Ensure .env is loaded before reading any env vars (paths.py calls load_dotenv)
+import app.paths  # noqa: F401
+
 
 @dataclass
 class ModelOption:
@@ -70,7 +73,8 @@ def any_provider_configured() -> bool:
 
 
 def use_mock() -> bool:
-    if _truthy("MOCK_AGENTS", "true"):
+    # Default is FALSE — real LLM is used unless MOCK_AGENTS=true is explicitly set
+    if _truthy("MOCK_AGENTS", "false"):
         return True
     return not any_provider_configured()
 
@@ -141,6 +145,11 @@ def chat_text(
         return _anthropic_text(
             model_id=model_id, system=system, user=user, json_mode=json_mode
         )
+
+    if json_mode:
+        has_json = "json" in (system or "").lower() or "json" in (user or "").lower()
+        if not has_json:
+            system = (system or "") + "\n\nNote: You must respond in valid JSON format."
 
     client = _openai_client(provider)
     kwargs: dict[str, Any] = {
@@ -321,3 +330,46 @@ def _anthropic_tools(
         messages.append({"role": "user", "content": tool_results})
 
     return transcript, []
+
+
+def _mock_embedding(text: str, dimensions: int = 1536) -> list[float]:
+    import hashlib
+    h = hashlib.sha256(text.encode("utf-8")).digest()
+    vector = []
+    for i in range(dimensions):
+        byte_index = (i * 3) % len(h)
+        val = (h[byte_index] - 128.0) / 128.0
+        vector.append(val)
+    norm = sum(x*x for x in vector) ** 0.5
+    return [x / norm for x in vector] if norm > 0 else [0.0] * dimensions
+
+
+def get_embedding(text: str, model: Optional[str] = None) -> list[float]:
+    if use_mock():
+        return _mock_embedding(text)
+        
+    provider, _ = resolve_provider(model)
+    
+    if provider == "openai" or os.getenv("OPENAI_API_KEY"):
+        try:
+            client = _openai_client("openai")
+            resp = client.embeddings.create(
+                input=[text],
+                model="text-embedding-3-small"
+            )
+            return resp.data[0].embedding
+        except Exception:
+            pass
+            
+    if provider == "gemini" or os.getenv("GEMINI_API_KEY"):
+        try:
+            client = _openai_client("gemini")
+            resp = client.embeddings.create(
+                input=[text],
+                model="text-embedding-004"
+            )
+            return resp.data[0].embedding
+        except Exception:
+            pass
+            
+    return _mock_embedding(text)

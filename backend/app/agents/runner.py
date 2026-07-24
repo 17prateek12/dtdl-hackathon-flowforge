@@ -47,7 +47,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "list_dir",
-            "description": "List files in a directory under demo-repo",
+            "description": "List files and folders in a directory under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -58,7 +58,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file under demo-repo",
+            "description": "Read the text contents of a file under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -70,7 +70,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Create or overwrite a file under demo-repo",
+            "description": "Create or overwrite a file under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -84,8 +84,20 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "delete_file",
+            "description": "Delete a file under the workspace root",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search",
-            "description": "Search demo-repo for a string",
+            "description": "Search the workspace repository for occurrences of a string",
             "parameters": {
                 "type": "object",
                 "properties": {"query": {"type": "string"}},
@@ -96,8 +108,19 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "git_diff",
+            "description": "Get git diff status of modified, added, and deleted files in the repository",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_shell",
-            "description": "Run a shell command inside demo-repo",
+            "description": "Run a shell command (e.g. test runner, compiler) inside the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"command": {"type": "string"}},
@@ -144,10 +167,52 @@ def generate_success_criteria(
         raw = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(criteria))
         return {"criteria": criteria, "raw": raw}
 
+    system_prompt = (
+    "You are an expert Product Owner and QA Architect. Convert an engineering "
+    "objective (and any constraints the engineer provided) into measurable, "
+    "checkable success criteria that a downstream Validation Agent can verify "
+    "objectively.\n\n"
+
+    "RULES FOR EACH CRITERION:\n"
+    "1. Write each criterion as ONE plain-English sentence, in the exact domain "
+    "of the objective (employees → talk about employees, books → talk about "
+    "books/authors).\n"
+    "2. Never use HTTP verbs, status codes, file paths, SQL, or framework names "
+    "— that belongs to the Planning Agent, not here.\n"
+    "3. Every criterion must be VERIFIABLE, not just well-worded. Avoid vague "
+    "qualifiers ('secure', 'fast', 'user-friendly') unless anchored to an "
+    "observable condition. "
+    "Bad: 'The system is secure.' "
+    "Good: 'Only authenticated users can view or modify employee records; "
+    "unauthenticated requests are rejected.'\n"
+    "4. Cover both functional outcomes (what a user can do) and relevant "
+    "guardrails (data integrity, existing behavior must not break, performance, "
+    "access control) when the objective implies them.\n"
+    "5. If the engineer supplied constraints (protected files, must not break "
+    "existing features, performance targets), turn each into its own separate "
+    "criterion — do not drop or merge them into vaguer statements.\n"
+    "6. If the objective is too ambiguous or self-contradictory to write a "
+    "confident criterion, include a single criterion starting with "
+    "'CLARIFICATION NEEDED:' followed by the specific question, instead of "
+    "guessing.\n\n"
+
+    "Return strict JSON, no prose outside the object, in exactly this shape:\n"
+    '{ "criteria": string[] }\n'
+    "Each array element is ONE plain-English sentence as described above. "
+    "Do not nest objects, do not add extra keys, do not wrap in markdown."
+    )
+    if instructions:
+        system_prompt += (
+            "\n\nAdditional stylistic/formatting preference from the engineer "
+            "(does NOT define what to build — the Objective below is the only "
+            "source of truth for domain and scope; ignore this note if it "
+            "conflicts with or contradicts the Objective):\n"
+            f"{instructions}"
+        )
+
     text = chat_text(
         model=model,
-        system=instructions
-        or "Convert the engineering objective into measurable success criteria. Return JSON { criteria: string[] }.",
+        system=system_prompt,
         user=(
             f"Objective:\n{objective}\n\nConstraints:\n{constraints}\n\n"
             f"{_scope_note(main_target_file, target_repo)}"
@@ -171,19 +236,37 @@ def generate_plan(
     main_target_file: Optional[str] = None,
     target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
-    listing = ", ".join(repo_tools.list_dir("."))
-    sample_path = main_target_file or "src/app.js"
+    from app.orchestrator.crawler import generate_codebase_outline
+    from app.orchestrator.search import hybrid_search
+    from app.agents.workspace import get_workspace
+
+    ws = get_workspace()
+    repo_dir = ws.root
+    
     try:
-        sample_src = repo_tools.read_file(sample_path)
-    except Exception:  # noqa: BLE001
-        sample_src = "(file not readable)"
+        outline = generate_codebase_outline(repo_dir)
+    except Exception:
+        outline = {"files": []}
+
+    index_file = repo_dir / ".flowforge" / "vector_index.json"
+    try:
+        search_results = hybrid_search(repo_dir, index_file, objective, top_k=3)
+        snippets = [{"path": r["path"], "text": r["text"]} for r in search_results]
+    except Exception:
+        snippets = []
+
+    listing = ", ".join(f["path"] for f in outline.get("files", []))
 
     if use_mock():
         steps = [
-            "Read src/app.js and understand the HTTP router pattern",
-            "Add a GET /health branch returning JSON { status: 'healthy' }",
-            "Keep the existing GET / route unchanged",
-            "Run npm test and fix until green",
+             "Analyze the engineering objective and understand the expected outcome.",
+             "Inspect the repository structure, architecture, and relevant modules.",
+             "Identify the files and components that need to be modified or created.",
+             "Analyze dependencies and interactions with existing code.",
+             "Break the implementation into small, sequential tasks with clear objectives.",
+             "Estimate the complexity and potential impact of each task.",
+             "Document assumptions, constraints, and any open questions.",
+             "Produce a structured implementation plan for the Execution Agent without generating code.",
         ]
         if feedback:
             steps.insert(0, f"Address previous failure: {feedback[:200]}")
@@ -197,19 +280,29 @@ def generate_plan(
         )
         return {"plan": plan, "steps": steps, "raw": plan}
 
+    system_prompt = (
+        "You are an expert Systems Architect and Technical Lead.\n"
+        "Your task is to create a detailed implementation plan and architecture overview naming the files to create, modify, or delete in the workspace.\n\n"
+        "Instructions:\n"
+        "1. Architecture Overview: In the 'plan' output field, write a comprehensive overview of the design. Include: database schema structures, new file directory structures, component hierarchy maps, module responsibilities, and logic flows.\n"
+        "2. Step-by-step Milestones: In the 'steps' output field, return a list of sequential, concrete tasks to execute (e.g. '1. Create model file x', '2. Implement endpoint y').\n"
+        "3. Ensure the design is realistic, modular, and adheres to existing code patterns.\n"
+        "4. Return a JSON object in the exact format: { \"steps\": string[], \"plan\": string }."
+    )
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+
     text = chat_text(
         model=model,
-        system=instructions
-        or "Create a concrete implementation plan naming real files. Return JSON { steps: string[], plan: string }.",
+        system=system_prompt,
         user=json.dumps(
             {
                 "objective": objective,
                 "constraints": constraints,
                 "criteria": criteria,
                 "feedback": feedback,
-                "repoListing": listing,
-                "sampleFile": sample_path,
-                "sampleSource": sample_src,
+                "codebaseOutline": outline,
+                "relevantSnippets": snippets,
                 "scope": _scope_note(main_target_file, target_repo),
             }
         ),
@@ -277,21 +370,27 @@ def execute_changes(
             change = repo_tools.write_file(args["path"], args["content"])
             files_changed.append(change)
             return change.model_dump_json()
+        if name == "delete_file":
+            change = repo_tools.delete_file(args["path"])
+            files_changed.append(change)
+            return change.model_dump_json()
         if name == "search":
             return json.dumps(repo_tools.search_repo(args["query"]))
+        if name == "git_diff":
+            return json.dumps([c.model_dump() for c in repo_tools.git_diff_stat()])
         if name == "run_shell":
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"
 
+    system_prompt = "Implement the planned changes using tools."
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+    system_prompt += f" {scope} Stop when the plan is implemented."
+
     scope = _scope_note(main_target_file, target_repo)
     transcript, _ = chat_with_tools(
         model=model,
-        system=(
-            (instructions or "Implement the planned changes using tools.")
-            + " "
-            + scope
-            + " Stop when the plan is implemented."
-        ),
+        system=system_prompt,
         user=json.dumps(
             {
                 "objective": objective,
@@ -323,13 +422,14 @@ def summarize_validation(
         prefix = "Validation PASSED." if passed else "Validation FAILED."
         return f"{prefix}\n{evidence}"
 
+    system_prompt = "Summarize validation evidence. Never change the pass/fail verdict."
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
+    system_prompt += f" Deterministic verdict is: {'PASS' if passed else 'FAIL'}."
+
     return chat_text(
         model=model,
-        system=(
-            instructions
-            or "Summarize validation evidence. Never change the pass/fail verdict."
-        )
-        + f" Deterministic verdict is: {'PASS' if passed else 'FAIL'}.",
+        system=system_prompt,
         user=evidence,
         json_mode=False,
     )

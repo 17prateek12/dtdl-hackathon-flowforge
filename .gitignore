@@ -50,6 +50,7 @@ data/runs/*.json
 
 # python backend
 backend/.venv/
+backend/env/
 __pycache__/
 *.pyc
 .Python
@@ -58,3 +59,4 @@ __pycache__/
 
 # editor / local history
 .history/
+backend/.flowforge
