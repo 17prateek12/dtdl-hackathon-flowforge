@@ -10,7 +10,7 @@ from app.paths import WORKFLOWS_DIR, workflow_path
 
 DEFAULT_WORKFLOW: dict = {
     "id": "default",
-    "name": "Add Health Endpoint Feature",
+    "name": "New Workflow",
     "maxAttempts": 3,
     "nodes": [
         {

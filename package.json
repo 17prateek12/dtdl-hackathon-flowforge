@@ -5,9 +5,9 @@
   "description": "LoopForge monorepo — Next.js UI + Python FastAPI orchestrator",
   "scripts": {
     "dev:web": "npm run dev --prefix frontend",
-    "dev:api": "cd backend && .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "dev:api": "cd backend && node ../scripts/dev-api.mjs",
     "dev": "npm run dev:api & npm run dev:web",
-    "backend:install": "cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+    "backend:install": "cd backend && python -m venv .venv && node ../scripts/pip-install.mjs",
     "install:all": "npm install --prefix frontend && npm run backend:install",
     "build": "npm run build --prefix frontend",
     "lint": "npm run lint --prefix frontend"
