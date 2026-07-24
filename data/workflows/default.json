@@ -23,7 +23,11 @@
         "command": null,
         "fileChecks": null,
         "objective": "Add a GET /health endpoint that returns JSON { status: \"healthy\" } with HTTP 200, and ensure unit tests pass.",
-        "constraints": "Only modify files under demo-repo. Follow existing patterns in src/app.js. Do not remove the existing GET / route."
+        "constraints": "Only modify files under demo-repo. Follow existing patterns in src/app.js. Do not remove the existing GET / route.",
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -49,7 +53,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -72,7 +80,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -98,7 +110,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -126,7 +142,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -149,7 +169,11 @@
         "command": "npm test",
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -174,7 +198,11 @@
           "src/app.js"
         ],
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -197,7 +225,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -220,7 +252,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -243,7 +279,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     },
     {
@@ -266,7 +306,11 @@
         "command": null,
         "fileChecks": null,
         "objective": null,
-        "constraints": null
+        "constraints": null,
+        "targetRepo": null,
+        "mainTargetFile": null,
+        "targetFiles": null,
+        "validateCommand": null
       }
     }
   ],
