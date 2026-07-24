@@ -243,7 +243,7 @@ def load_workflow(workflow_id: str = "default") -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow_id)
     if path.exists():
-        return Workflow.model_validate(json.loads(path.read_text()))
+        return Workflow.model_validate(json.loads(path.read_text(encoding="utf-8")))
     workflow = Workflow.model_validate(deepcopy(DEFAULT_WORKFLOW))
     save_workflow(workflow)
     return workflow
@@ -252,7 +252,7 @@ def load_workflow(workflow_id: str = "default") -> Workflow:
 def save_workflow(workflow: Workflow) -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow.id)
-    path.write_text(workflow.model_dump_json(indent=2))
+    path.write_text(workflow.model_dump_json(indent=2), encoding="utf-8")
     return workflow
 
 

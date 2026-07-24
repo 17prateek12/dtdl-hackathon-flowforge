@@ -47,7 +47,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "list_dir",
-            "description": "List files in a directory under demo-repo",
+            "description": "List files and folders in a directory under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -58,7 +58,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file under demo-repo",
+            "description": "Read the text contents of a file under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -70,7 +70,7 @@ TOOL_DEFS = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Create or overwrite a file under demo-repo",
+            "description": "Create or overwrite a file under the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -84,8 +84,20 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "delete_file",
+            "description": "Delete a file under the workspace root",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search",
-            "description": "Search demo-repo for a string",
+            "description": "Search the workspace repository for occurrences of a string",
             "parameters": {
                 "type": "object",
                 "properties": {"query": {"type": "string"}},
@@ -96,8 +108,19 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "git_diff",
+            "description": "Get git diff status of modified, added, and deleted files in the repository",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_shell",
-            "description": "Run a shell command inside demo-repo",
+            "description": "Run a shell command (e.g. test runner, compiler) inside the workspace root",
             "parameters": {
                 "type": "object",
                 "properties": {"command": {"type": "string"}},
@@ -171,12 +194,26 @@ def generate_plan(
     main_target_file: Optional[str] = None,
     target_repo: Optional[str] = None,
 ) -> dict[str, Any]:
-    listing = ", ".join(repo_tools.list_dir("."))
-    sample_path = main_target_file or "src/app.js"
+    from app.orchestrator.crawler import generate_codebase_outline
+    from app.orchestrator.search import hybrid_search
+    from app.agents.workspace import get_workspace
+
+    ws = get_workspace()
+    repo_dir = ws.root
+    
     try:
-        sample_src = repo_tools.read_file(sample_path)
-    except Exception:  # noqa: BLE001
-        sample_src = "(file not readable)"
+        outline = generate_codebase_outline(repo_dir)
+    except Exception:
+        outline = {"files": []}
+
+    index_file = repo_dir / ".flowforge" / "vector_index.json"
+    try:
+        search_results = hybrid_search(repo_dir, index_file, objective, top_k=3)
+        snippets = [{"path": r["path"], "text": r["text"]} for r in search_results]
+    except Exception:
+        snippets = []
+
+    listing = ", ".join(f["path"] for f in outline.get("files", []))
 
     if use_mock():
         steps = [
@@ -207,9 +244,8 @@ def generate_plan(
                 "constraints": constraints,
                 "criteria": criteria,
                 "feedback": feedback,
-                "repoListing": listing,
-                "sampleFile": sample_path,
-                "sampleSource": sample_src,
+                "codebaseOutline": outline,
+                "relevantSnippets": snippets,
                 "scope": _scope_note(main_target_file, target_repo),
             }
         ),
@@ -277,8 +313,14 @@ def execute_changes(
             change = repo_tools.write_file(args["path"], args["content"])
             files_changed.append(change)
             return change.model_dump_json()
+        if name == "delete_file":
+            change = repo_tools.delete_file(args["path"])
+            files_changed.append(change)
+            return change.model_dump_json()
         if name == "search":
             return json.dumps(repo_tools.search_repo(args["query"]))
+        if name == "git_diff":
+            return json.dumps([c.model_dump() for c in repo_tools.git_diff_stat()])
         if name == "run_shell":
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"

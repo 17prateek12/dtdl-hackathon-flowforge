@@ -155,3 +155,21 @@ def revert_files(rel_paths: list[str]) -> None:
 
 def list_extra_file_changes(changed_paths: list[str]) -> list[str]:
     return get_workspace().extra_files_changed(changed_paths)
+
+
+def delete_file(rel_path: str) -> FileChange:
+    full = _resolve_safe(rel_path)
+    lines_removed = 0
+    if full.exists():
+        try:
+            before = full.read_text(encoding="utf-8", errors="ignore")
+            lines_removed = len(before.splitlines())
+            full.unlink()
+        except Exception:
+            pass
+    return FileChange(
+        path=normalize_rel_path(rel_path),
+        action="deleted",
+        linesAdded=0,
+        linesRemoved=lines_removed,
+    )

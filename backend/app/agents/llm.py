@@ -321,3 +321,46 @@ def _anthropic_tools(
         messages.append({"role": "user", "content": tool_results})
 
     return transcript, []
+
+
+def _mock_embedding(text: str, dimensions: int = 1536) -> list[float]:
+    import hashlib
+    h = hashlib.sha256(text.encode("utf-8")).digest()
+    vector = []
+    for i in range(dimensions):
+        byte_index = (i * 3) % len(h)
+        val = (h[byte_index] - 128.0) / 128.0
+        vector.append(val)
+    norm = sum(x*x for x in vector) ** 0.5
+    return [x / norm for x in vector] if norm > 0 else [0.0] * dimensions
+
+
+def get_embedding(text: str, model: Optional[str] = None) -> list[float]:
+    if use_mock():
+        return _mock_embedding(text)
+        
+    provider, _ = resolve_provider(model)
+    
+    if provider == "openai" or os.getenv("OPENAI_API_KEY"):
+        try:
+            client = _openai_client("openai")
+            resp = client.embeddings.create(
+                input=[text],
+                model="text-embedding-3-small"
+            )
+            return resp.data[0].embedding
+        except Exception:
+            pass
+            
+    if provider == "gemini" or os.getenv("GEMINI_API_KEY"):
+        try:
+            client = _openai_client("gemini")
+            resp = client.embeddings.create(
+                input=[text],
+                model="text-embedding-004"
+            )
+            return resp.data[0].embedding
+        except Exception:
+            pass
+            
+    return _mock_embedding(text)

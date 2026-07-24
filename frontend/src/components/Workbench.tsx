@@ -594,7 +594,7 @@ function WorkbenchInner() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <NodeLibrary onLoadTemplate={onLoadTemplate} />
+        <NodeLibrary onLoadTemplate={onLoadTemplate} runId={run?.id} />
         <div className="relative min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
           <ReactFlow
             nodes={nodes}
