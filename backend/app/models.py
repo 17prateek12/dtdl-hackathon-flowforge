@@ -154,3 +154,16 @@ class HumanGateDecision(BaseModel):
 class StartRunBody(BaseModel):
     workflowId: str = "default"
     workflow: Optional["Workflow"] = None  # if provided, used directly instead of reading from disk
+
+
+class RAGIndexRequest(BaseModel):
+    targetRepo: Optional[str] = "./demo-repo"
+    targetFiles: Optional[list[str]] = None
+    chunkSize: int = 400
+    chunkOverlap: int = 50
+
+
+class RAGSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+    targetFiles: Optional[list[str]] = None

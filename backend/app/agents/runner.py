@@ -119,6 +119,21 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "grep_search",
+            "description": "Grep search repository files for code patterns, function names, endpoints, or keywords with line numbers",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search keyword or pattern to grep for"},
+                    "path": {"type": "string", "description": "Directory path to search in (default .)"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_shell",
             "description": "Run a shell command (e.g. test runner, compiler) inside the workspace root",
             "parameters": {
@@ -378,6 +393,10 @@ def execute_changes(
             return json.dumps(repo_tools.search_repo(args["query"]))
         if name == "git_diff":
             return json.dumps([c.model_dump() for c in repo_tools.git_diff_stat()])
+        if name == "grep_search":
+            return json.dumps(
+                repo_tools.grep_search(args["query"], args.get("path") or ".")
+            )
         if name == "run_shell":
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"

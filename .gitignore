@@ -50,7 +50,9 @@ data/runs/*.json
 
 # python backend
 backend/.venv/
+backend/venv/
 backend/env/
+backend/data/qdrant_db/
 __pycache__/
 *.pyc
 .Python

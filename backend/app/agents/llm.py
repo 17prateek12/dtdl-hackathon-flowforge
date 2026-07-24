@@ -97,12 +97,9 @@ def resolve_provider(model: Optional[str]) -> tuple[str, str]:
         m = next(x for x in models if x.provider == "gemini")
         return "gemini", model or m.id
 
-    # Prefer Mistral when configured, else OpenAI
-    if os.getenv("MISTRAL_API_KEY"):
-        m = next(x for x in models if x.provider == "mistral")
-        return "mistral", model or m.id
-    m = next(x for x in models if x.provider == "openai")
-    return "openai", model or m.id
+    # Default provider: Mistral AI
+    m = next((x for x in models if x.provider == "mistral"), models[0])
+    return "mistral", model or m.id
 
 
 def _openai_client(provider: str):

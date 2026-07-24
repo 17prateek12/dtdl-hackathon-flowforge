@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from app.models import HumanGateDecision, StartRunBody, Workflow
+from app.models import HumanGateDecision, RAGIndexRequest, RAGSearchRequest, StartRunBody, Workflow
 from app.orchestrator.loop import resume_run, start_run, stop_run
 from app.agents.llm import list_models
 from app.store.run_store import list_runs, load_run
@@ -273,3 +273,72 @@ def get_codebase_review(
             }
         else:
             raise HTTPException(status_code=500, detail=f"Codebase review failed: {e}")
+
+
+from app.rag.indexer import rag_manager
+
+
+@app.get("/api/rag/status")
+def get_rag_status():
+    return rag_manager.get_status()
+
+
+@app.post("/api/rag/index")
+def post_rag_index(body: RAGIndexRequest | None = None):
+    req = body or RAGIndexRequest()
+    repo = req.targetRepo or "./demo-repo"
+    try:
+        res = rag_manager.index_directory(
+            repo_path=repo,
+            target_files=req.targetFiles,
+            chunk_size=req.chunkSize,
+            chunk_overlap=req.chunkOverlap,
+        )
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/rag/search")
+def post_rag_search(body: RAGSearchRequest):
+    results = rag_manager.search(
+        query=body.query,
+        limit=body.limit,
+        target_files=body.targetFiles,
+    )
+    return {"query": body.query, "results": results, "count": len(results)}
+
+
+@app.get("/api/fs/browse")
+def get_fs_browse(path: str = Query(".")):
+    try:
+        from pathlib import Path
+        base_dir = Path(path).resolve()
+        if not base_dir.exists() or not base_dir.is_dir():
+            base_dir = Path(".").resolve()
+
+        items = []
+        for p in base_dir.iterdir():
+            if p.name.startswith(".") or p.name in (
+                "node_modules",
+                "__pycache__",
+                "dist",
+                "build",
+                ".venv",
+            ):
+                continue
+            items.append({
+                "name": p.name,
+                "path": str(p),
+                "isDir": p.is_dir(),
+            })
+
+        items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
+        parent = str(base_dir.parent) if base_dir != base_dir.parent else None
+        return {
+            "currentPath": str(base_dir),
+            "parentPath": parent,
+            "items": items,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
