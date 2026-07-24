@@ -66,3 +66,110 @@ def deterministic_validate(
         "commandPassed": command_passed,
         "fileCheckResults": file_check_results,
     }
+
+
+def _parse_test_run_summary(stdout: str) -> str:
+    passed = failed = total = None
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# pass "):
+            passed = stripped.split()[-1]
+        elif stripped.startswith("# fail "):
+            failed = stripped.split()[-1]
+        elif stripped.startswith("# tests "):
+            total = stripped.split()[-1]
+    if passed is not None and failed is not None:
+        if total is not None:
+            return f"{passed}/{total} tests passed, {failed} failed"
+        return f"{passed} passed, {failed} failed"
+    if not stdout.strip():
+        return "no output"
+    return stdout.strip().splitlines()[0][:80]
+
+
+def _extract_subtest_lines(stdout: str, limit: int = 6) -> list[str]:
+    seen: set[str] = set()
+    hits: list[str] = []
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        name: str | None = None
+        if stripped.startswith("# Subtest:"):
+            name = stripped.replace("# Subtest:", "", 1).strip()
+        elif stripped.startswith("ok ") and " - " in stripped:
+            name = stripped.split(" - ", 1)[1].strip()
+        if name and name not in seen:
+            seen.add(name)
+            hits.append(name)
+        if len(hits) >= limit:
+            break
+    return hits
+
+
+def format_validation_report(
+    *,
+    test_generation: dict,
+    command_result: CommandResult,
+    validation: dict,
+    summary: str,
+    files_changed: list | None = None,
+) -> str:
+    passed = validation["passed"]
+    verdict = "PASS" if passed else "FAIL"
+    test_cases = test_generation.get("testCases") or []
+    test_files = test_generation.get("testFiles") or []
+
+    lines = [
+        f"=== VALIDATION {verdict} ===",
+        "",
+        "How code was checked:",
+        "  1. Validation Agent prepared tests for the success criteria",
+        "  2. Test suite ran via shell command",
+        "  3. Required source files were verified on disk",
+        "",
+        "--- Test generation ---",
+        test_generation.get("summary", "Tests prepared"),
+    ]
+
+    if test_files:
+        lines.append(f"Test file: {', '.join(test_files)}")
+
+    transcript = test_generation.get("transcript") or []
+    for step in transcript[:4]:
+        lines.append(f"  → {step}")
+
+    if test_cases:
+        lines.append("")
+        lines.append("Test cases:")
+        for name in test_cases:
+            lines.append(f"  • {name}")
+
+    lines.extend([
+        "",
+        "--- Test run ---",
+        f"Command: {command_result.command}",
+        f"Exit code: {command_result.exit_code} ({'PASS' if command_result.passed else 'FAIL'})",
+        f"Summary: {_parse_test_run_summary(command_result.stdout)}",
+    ])
+
+    highlights = _extract_subtest_lines(command_result.stdout)
+    if highlights:
+        lines.append("Results:")
+        for name in highlights:
+            lines.append(f"  ✓ {name}")
+
+    file_results = validation.get("fileCheckResults") or []
+    if file_results:
+        lines.append("")
+        lines.append("--- File checks ---")
+        for f in file_results:
+            status = "exists" if f["exists"] else "MISSING"
+            lines.append(f"  • {f['path']}: {status}")
+
+    lines.extend([
+        "",
+        "--- Summary ---",
+        summary.strip() or f"Validation {verdict.lower()} — all checks complete.",
+        "",
+        f"Overall verdict: {verdict}",
+    ])
+    return "\n".join(lines)

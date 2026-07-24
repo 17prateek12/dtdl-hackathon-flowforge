@@ -129,13 +129,47 @@ def git_diff_stat() -> list[FileChange]:
         if not line.strip():
             continue
         code = line[:2].strip()
-        file_path = line[3:].strip()
+        file_path = line[3:].strip().replace("\\", "/")
         action = "modified"
         if "A" in code or code == "??":
             action = "created"
         if "D" in code:
             action = "deleted"
         changes.append(FileChange(path=file_path, action=action))  # type: ignore[arg-type]
+    return changes
+
+
+def git_diff_since(rev: str) -> list[FileChange]:
+    """All file changes in the working tree since a baseline commit."""
+    ensure_git()
+    changes: list[FileChange] = []
+    seen: set[str] = set()
+
+    diff = run_shell(f'git diff --name-status {rev}')
+    for line in diff["stdout"].splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        code, file_path = parts[0].strip(), parts[1].strip().replace("\\", "/")
+        action = "modified"
+        if code.startswith("A"):
+            action = "created"
+        elif code.startswith("D"):
+            action = "deleted"
+        changes.append(FileChange(path=file_path, action=action))  # type: ignore[arg-type]
+        seen.add(file_path)
+
+    untracked = run_shell("git ls-files --others --exclude-standard")
+    for file_path in untracked["stdout"].splitlines():
+        normalized = file_path.strip().replace("\\", "/")
+        if normalized and normalized not in seen:
+            changes.append(
+                FileChange(path=normalized, action="created")  # type: ignore[arg-type]
+            )
+            seen.add(normalized)
+
     return changes
 
 

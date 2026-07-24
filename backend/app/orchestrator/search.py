@@ -88,7 +88,7 @@ class SimpleBM25:
             scores.append(score)
         return scores
 
-def build_or_update_index(repo_dir: Path, index_file: Path) -> dict:
+def build_or_update_index(repo_dir: Path, index_file: Path) -> tuple[dict, bool]:
     repo_dir = repo_dir.resolve()
     index_data = {"files": {}}
     
@@ -142,11 +142,11 @@ def build_or_update_index(repo_dir: Path, index_file: Path) -> dict:
     if updated:
         index_file.parent.mkdir(parents=True, exist_ok=True)
         index_file.write_text(json.dumps(index_data, indent=2), encoding="utf-8")
-        
-    return index_data
 
-def hybrid_search(repo_dir: Path, index_file: Path, query: str, top_k: int = 5) -> list[dict]:
-    index_data = build_or_update_index(repo_dir, index_file)
+    return index_data, updated
+
+def hybrid_search(repo_dir: Path, index_file: Path, query: str, top_k: int = 5) -> tuple[list[dict], bool]:
+    index_data, index_updated = build_or_update_index(repo_dir, index_file)
     
     corpus_chunks = []
     for path_str, f_data in index_data.get("files", {}).items():
@@ -185,4 +185,4 @@ def hybrid_search(repo_dir: Path, index_file: Path, query: str, top_k: int = 5) 
         })
         
     ranked_results.sort(key=lambda x: x["score"], reverse=True)
-    return ranked_results[:top_k]
+    return ranked_results[:top_k], index_updated

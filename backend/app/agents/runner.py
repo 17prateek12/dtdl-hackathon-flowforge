@@ -249,11 +249,20 @@ def generate_plan(
         outline = {"files": []}
 
     index_file = repo_dir / ".flowforge" / "vector_index.json"
+    index_updated = False
     try:
-        search_results = hybrid_search(repo_dir, index_file, objective, top_k=3)
+        search_results, index_updated = hybrid_search(
+            repo_dir, index_file, objective, top_k=3
+        )
         snippets = [{"path": r["path"], "text": r["text"]} for r in search_results]
     except Exception:
         snippets = []
+
+    touched_files: list[FileChange] = []
+    if index_updated:
+        touched_files.append(
+            FileChange(path=".flowforge/vector_index.json", action="modified")
+        )
 
     listing = ", ".join(f["path"] for f in outline.get("files", []))
 
@@ -278,7 +287,12 @@ def generate_plan(
                 "Risk: breaking existing / route if conditions are ordered poorly",
             ]
         )
-        return {"plan": plan, "steps": steps, "raw": plan}
+        return {
+            "plan": plan,
+            "steps": steps,
+            "raw": plan,
+            "touchedFiles": touched_files,
+        }
 
     system_prompt = (
         "You are an expert Systems Architect and Technical Lead.\n"
@@ -313,7 +327,12 @@ def generate_plan(
     plan = parsed.get("plan") or "\n".join(
         f"{i + 1}. {s}" for i, s in enumerate(steps)
     )
-    return {"plan": plan, "steps": steps, "raw": plan}
+    return {
+        "plan": plan,
+        "steps": steps,
+        "raw": plan,
+        "touchedFiles": touched_files,
+    }
 
 
 def _apply_health_endpoint_fix() -> list[FileChange]:
@@ -411,6 +430,185 @@ def execute_changes(
     }
 
 
+MOCK_TEST_FILE = '''import assert from "node:assert/strict";
+import test from "node:test";
+import { startServer } from "../src/app.js";
+
+async function get(port, path) {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`);
+  const body = await res.json();
+  return { status: res.status, body };
+}
+
+test("GET / returns ok", async () => {
+  const { server, port } = await startServer();
+  try {
+    const { status, body } = await get(port, "/");
+    assert.equal(status, 200);
+    assert.equal(body.status, "ok");
+  } finally {
+    server.close();
+  }
+});
+
+test("GET /health returns healthy", async () => {
+  const { server, port } = await startServer();
+  try {
+    const { status, body } = await get(port, "/health");
+    assert.equal(status, 200);
+    assert.equal(body.status, "healthy");
+  } finally {
+    server.close();
+  }
+});
+'''
+
+
+def _extract_test_names(content: str) -> list[str]:
+    names: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith('test("') or stripped.startswith("test('"):
+            quote = '"' if stripped.startswith('test("') else "'"
+            end = stripped.find(quote, 6)
+            if end > 6:
+                names.append(stripped[6:end])
+    return names
+
+
+def generate_validation_tests(
+    *,
+    objective: str,
+    criteria: list[str],
+    plan: str = "",
+    files_changed: Optional[list[FileChange]] = None,
+    validate_command: str = "npm test",
+    instructions: Optional[str] = None,
+    model: Optional[str] = None,
+    main_target_file: Optional[str] = None,
+    target_repo: Optional[str] = None,
+) -> dict[str, Any]:
+    """Generate or update test files that verify the implementation against criteria."""
+    test_path = "test/app.test.js"
+    changed_paths = [f.path for f in (files_changed or [])]
+
+    if use_mock():
+        transcript = [
+            "Reading success criteria and changed files",
+            f"Target test file: {test_path}",
+        ]
+        if criteria:
+            transcript.append(f"Mapping {len(criteria)} criteria to test assertions")
+            for i, c in enumerate(criteria[:5]):
+                transcript.append(f"  Criterion {i + 1}: {c[:120]}")
+
+        try:
+            existing = repo_tools.read_file(test_path)
+            action = "verified"
+        except Exception:  # noqa: BLE001
+            existing = ""
+            action = "created"
+
+        content = MOCK_TEST_FILE
+        files_changed_out: list[FileChange] = []
+        if not existing.strip() or existing.strip() != content.strip():
+            change = repo_tools.write_file(test_path, content)
+            files_changed_out.append(change)
+            transcript.append(f"Wrote {test_path} ({change.action})")
+            action = change.action
+        else:
+            transcript.append(f"Existing tests in {test_path} already cover criteria")
+
+        test_names = _extract_test_names(content)
+        transcript.append(f"Test cases ready: {', '.join(test_names) or 'none detected'}")
+        transcript.append(f"Will run: {validate_command}")
+
+        return {
+            "summary": (
+                f"{'Created' if action == 'created' else 'Updated' if action == 'modified' else 'Verified'} "
+                f"validation tests in {test_path} ({len(test_names)} test case(s))"
+            ),
+            "testFiles": [test_path],
+            "testPreview": {test_path: content},
+            "testCases": test_names,
+            "filesChanged": files_changed_out,
+            "transcript": transcript,
+        }
+
+    files_changed_out: list[FileChange] = []
+
+    def execute_tool(name: str, args: dict[str, Any]) -> str:
+        if name == "list_dir":
+            return json.dumps(repo_tools.list_dir(args.get("path") or "."))
+        if name == "read_file":
+            return repo_tools.read_file(args["path"])
+        if name == "write_file":
+            change = repo_tools.write_file(args["path"], args["content"])
+            files_changed_out.append(change)
+            return change.model_dump_json()
+        if name == "search":
+            return json.dumps(repo_tools.search_repo(args["query"]))
+        if name == "git_diff":
+            return json.dumps([c.model_dump() for c in repo_tools.git_diff_stat()])
+        return f"Unknown tool {name}"
+
+    scope = _scope_note(main_target_file, target_repo)
+    system_prompt = (
+        "You are a Validation Agent. Generate or update automated tests that verify "
+        "the implementation meets the success criteria.\n"
+        "Use read_file to inspect source and existing tests, then write_file to create "
+        "or update test files. Prefer the project's existing test framework and patterns.\n"
+        "Do not modify production source files — only test files."
+    )
+    if instructions:
+        system_prompt += f"\n\nAdditional instructions:\n{instructions}"
+    system_prompt += f"\n\n{scope}"
+
+    transcript, _ = chat_with_tools(
+        model=model,
+        system=system_prompt,
+        user=json.dumps(
+            {
+                "objective": objective,
+                "criteria": criteria,
+                "plan": plan,
+                "changedFiles": changed_paths,
+                "validateCommand": validate_command,
+            }
+        ),
+        tools=[
+            t
+            for t in TOOL_DEFS
+            if t["function"]["name"]
+            in ("list_dir", "read_file", "write_file", "search", "git_diff")
+        ],
+        execute_tool=execute_tool,
+    )
+
+    test_files = [f.path for f in files_changed_out if "test" in f.path.lower()]
+    if not test_files:
+        test_files = [test_path]
+
+    test_preview: dict[str, str] = {}
+    test_cases: list[str] = []
+    for path in test_files:
+        try:
+            content = repo_tools.read_file(path)
+            test_preview[path] = content
+            test_cases.extend(_extract_test_names(content))
+        except Exception:  # noqa: BLE001
+            continue
+
+    return {
+        "summary": transcript[-1] if transcript else "Validation tests prepared",
+        "testFiles": test_files,
+        "testPreview": test_preview,
+        "testCases": test_cases,
+        "filesChanged": files_changed_out,
+        "transcript": transcript,
+    }
+
+
 def summarize_validation(
     *,
     passed: bool,
@@ -419,8 +617,9 @@ def summarize_validation(
     model: Optional[str] = None,
 ) -> str:
     if use_mock():
-        prefix = "Validation PASSED." if passed else "Validation FAILED."
-        return f"{prefix}\n{evidence}"
+        if passed:
+            return "All automated checks passed — tests green and required files present."
+        return "Validation failed — review test output and file checks above."
 
     system_prompt = "Summarize validation evidence. Never change the pass/fail verdict."
     if instructions:
