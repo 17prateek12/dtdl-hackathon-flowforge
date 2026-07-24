@@ -24,6 +24,11 @@ fi
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 
+# Free the port if something is already listening (e.g. a crashed dev server).
+echo "Releasing port ${PORT} if occupied..."
+fuser -k "${PORT}/tcp" 2>/dev/null || true
+sleep 0.5
+
 echo "Starting LoopForge UI on http://localhost:${PORT}"
 echo "API proxy target: ${LOOPFORGE_API_ORIGIN:-http://127.0.0.1:8000}"
 exec npm run dev -- --hostname "${HOST}" --port "${PORT}"
