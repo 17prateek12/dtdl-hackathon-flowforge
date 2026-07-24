@@ -25,6 +25,13 @@ import type { RunRecord, Workflow, WorkflowNode, NodeType } from "@/lib/types";
 
 const nodeTypes = { loopNode: LoopNode };
 
+const FIT_VIEW_OPTIONS = {
+  padding: 0.22,
+  duration: 280,
+  maxZoom: 0.92,
+  minZoom: 0.12,
+} as const;
+
 const DEFAULT_TEMPLATE_WORKFLOW: Workflow = {
   id: "default",
   name: "Default Coding Loop",
@@ -264,7 +271,9 @@ function WorkbenchInner() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>("criteria");
   const [run, setRun] = useState<RunRecord | null>(null);
-  const [consoleCollapsed, setConsoleCollapsed] = useState(false);
+  const [consoleCollapsed, setConsoleCollapsed] = useState(true);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<any[]>([]);
@@ -338,6 +347,30 @@ function WorkbenchInner() {
     if (!workflow?.nodes || !selectedId) return null;
     return workflow.nodes.find((n) => n.id === selectedId) ?? null;
   }, [workflow, selectedId]);
+
+  const fitCanvasToNodes = useCallback(() => {
+    if (!workflow?.nodes?.length) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void reactFlow.fitView(FIT_VIEW_OPTIONS);
+      });
+    });
+  }, [workflow?.nodes?.length, reactFlow]);
+
+  useEffect(() => {
+    fitCanvasToNodes();
+  }, [fitCanvasToNodes, workflow?.id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(fitCanvasToNodes, 240);
+    return () => window.clearTimeout(timer);
+  }, [fitCanvasToNodes, leftSidebarCollapsed, rightSidebarCollapsed, consoleCollapsed]);
+
+  useEffect(() => {
+    const onResize = () => fitCanvasToNodes();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fitCanvasToNodes]);
 
   const onNodeChange = useCallback(
     (nodeId: string, patch: Partial<WorkflowNode["data"]>) => {
@@ -595,6 +628,22 @@ function WorkbenchInner() {
           </span>
           <button
             type="button"
+            onClick={() => setLeftSidebarCollapsed((v) => !v)}
+            title={leftSidebarCollapsed ? "Show library" : "Hide library"}
+            className="hidden rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:inline"
+          >
+            {leftSidebarCollapsed ? "◧ Library" : "◨ Library"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRightSidebarCollapsed((v) => !v)}
+            title={rightSidebarCollapsed ? "Show inspector" : "Hide inspector"}
+            className="hidden rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:inline"
+          >
+            {rightSidebarCollapsed ? "Inspector ◧" : "Inspector ◨"}
+          </button>
+          <button
+            type="button"
             onClick={() => void saveWorkflow()}
             disabled={busy || !workflow}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
@@ -652,13 +701,24 @@ function WorkbenchInner() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <NodeLibrary onLoadTemplate={onLoadTemplate} runId={run?.id} />
-        <div className="relative min-w-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
+        <NodeLibrary
+          onLoadTemplate={onLoadTemplate}
+          runId={run?.id}
+          collapsed={leftSidebarCollapsed}
+          onToggleCollapse={() => setLeftSidebarCollapsed((v) => !v)}
+        />
+        <div
+          className="relative h-full min-h-0 min-w-0 flex-1"
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
             fitView
+            fitViewOptions={FIT_VIEW_OPTIONS}
+            className="!h-full !w-full"
             nodesDraggable
             nodesConnectable
             elementsSelectable
@@ -670,7 +730,13 @@ function WorkbenchInner() {
             <Controls />
           </ReactFlow>
         </div>
-        <NodeInspector node={selectedNode} onChange={onNodeChange} />
+        <NodeInspector
+          node={selectedNode}
+          onChange={onNodeChange}
+          models={models}
+          collapsed={rightSidebarCollapsed}
+          onToggleCollapse={() => setRightSidebarCollapsed((v) => !v)}
+        />
       </div>
 
       <RunConsole

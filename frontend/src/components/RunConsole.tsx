@@ -24,7 +24,7 @@ interface Props {
 export function RunConsole({ run, collapsed, onToggle, selectedNodeId }: Props) {
   const events = filterEvents(run?.events ?? [], selectedNodeId);
   const files = run?.filesChanged ?? [];
-  const [height, setHeight] = useState<number>(150);
+  const [height, setHeight] = useState<number>(112);
   const [isDragging, setIsDragging] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 

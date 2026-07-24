@@ -14,13 +14,62 @@ interface Props {
   node: WorkflowNode | null;
   onChange: (nodeId: string, patch: Partial<WorkflowNode["data"]>) => void;
   models?: ModelOption[];
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function NodeInspector({ node, onChange, models }: Props) {
+function CollapseIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {direction === "left" ? (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      )}
+    </svg>
+  );
+}
+
+export function NodeInspector({
+  node,
+  onChange,
+  models,
+  collapsed = false,
+  onToggleCollapse,
+}: Props) {
+  if (collapsed) {
+    return (
+      <aside className="flex w-11 shrink-0 flex-col items-center border-l border-slate-200 bg-white py-3">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title="Show node inspector"
+          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-800 hover:shadow-sm transition-colors"
+        >
+          <CollapseIcon direction="left" />
+        </button>
+        <span
+          className="mt-6 text-[9px] font-semibold uppercase tracking-widest text-slate-400"
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+        >
+          Inspector
+        </span>
+      </aside>
+    );
+  }
+
   if (!node) {
     return (
-      <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <aside className="relative flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white transition-[width] duration-200">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title="Hide node inspector"
+          className="absolute left-2 top-2 z-10 rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700 hover:shadow-sm transition-colors"
+        >
+          <CollapseIcon direction="right" />
+        </button>
+        <div className="border-b border-slate-200 px-3 py-2.5 pl-10 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Node Inspector
         </div>
         <div className="p-4 text-sm text-slate-400">Select a node to inspect</div>
@@ -34,8 +83,16 @@ export function NodeInspector({ node, onChange, models }: Props) {
   const showInput = d.nodeType === "input";
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-3 py-2.5">
+    <aside className="relative flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white transition-[width] duration-200">
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        title="Hide node inspector"
+        className="absolute left-2 top-2 z-10 rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700 hover:shadow-sm transition-colors"
+      >
+        <CollapseIcon direction="right" />
+      </button>
+      <div className="border-b border-slate-200 px-3 py-2.5 pl-10">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Node Inspector
         </div>
