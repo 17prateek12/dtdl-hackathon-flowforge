@@ -40,6 +40,10 @@ class WorkflowNodeConfig(BaseModel):
     fileChecks: Optional[list[str]] = None
     objective: Optional[str] = None
     constraints: Optional[str] = None
+    targetRepo: Optional[str] = None
+    mainTargetFile: Optional[str] = None
+    targetFiles: Optional[list[str]] = None
+    validateCommand: Optional[str] = None
 
 
 class Position(BaseModel):
@@ -105,10 +109,11 @@ class NodeExecutionReceipt(BaseModel):
 
 class PendingHumanGate(BaseModel):
     nodeId: str
-    kind: Literal["criteria", "final"]
+    kind: Literal["criteria", "final", "extra_files"]
     title: str
     summary: str
     editableText: Optional[str] = None
+    extraFiles: Optional[list[str]] = None
 
 
 class RunRecord(BaseModel):
@@ -125,6 +130,11 @@ class RunRecord(BaseModel):
     pendingGate: Optional[PendingHumanGate] = None
     objective: str = ""
     constraints: str = ""
+    targetRepo: str = ""
+    mainTargetFile: str = ""
+    targetFiles: list[str] = Field(default_factory=list)
+    approvedExtraFiles: list[str] = Field(default_factory=list)
+    validateCommand: str = ""
     criteria: list[str] = Field(default_factory=list)
     plan: str = ""
     validationEvidence: Optional[str] = None
@@ -138,6 +148,7 @@ class RunRecord(BaseModel):
 class HumanGateDecision(BaseModel):
     action: Literal["approve", "reject", "edit"]
     editedText: Optional[str] = None
+    feedback: Optional[str] = None
 
 
 class StartRunBody(BaseModel):

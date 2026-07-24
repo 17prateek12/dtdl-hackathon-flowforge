@@ -26,9 +26,12 @@ DEFAULT_WORKFLOW: dict = {
                     "with HTTP 200, and ensure unit tests pass."
                 ),
                 "constraints": (
-                    "Only modify files under demo-repo. Follow existing patterns in "
-                    "src/app.js. Do not remove the existing GET / route."
+                    "Focus changes on the main target file. Other files may be "
+                    "changed if needed, but will require human approval."
                 ),
+                "targetRepo": "demo-repo",
+                "mainTargetFile": "src/app.js",
+                "validateCommand": "npm test",
             },
         },
         {
@@ -44,7 +47,7 @@ DEFAULT_WORKFLOW: dict = {
                     "Convert the engineering objective into measurable success criteria. "
                     "Ensure the criteria are specific, verifiable and prioritized."
                 ),
-                "model": "gpt-4o-mini",
+                "model": "mistral-small-latest",
                 "tools": ["Repo Reader", "Search"],
                 "maxRetries": 2,
                 "timeout": 300,
@@ -73,7 +76,7 @@ DEFAULT_WORKFLOW: dict = {
                     "Create or revise a concrete implementation plan grounded in real "
                     "files in the repository. Name modules, order of work, and risks."
                 ),
-                "model": "gpt-4o-mini",
+                "model": "mistral-small-latest",
                 "tools": ["Repo Reader", "Search"],
                 "maxRetries": 2,
                 "timeout": 300,
@@ -92,7 +95,7 @@ DEFAULT_WORKFLOW: dict = {
                     "Implement the planned changes in the repository. Follow coding "
                     "standards and existing patterns. Prefer minimal diffs."
                 ),
-                "model": "gpt-4o-mini",
+                "model": "mistral-small-latest",
                 "tools": ["File Editor", "Search", "Git", "Terminal"],
                 "maxRetries": 2,
                 "timeout": 300,
@@ -124,7 +127,7 @@ DEFAULT_WORKFLOW: dict = {
                     "check results."
                 ),
                 "fileChecks": ["src/app.js"],
-                "model": "gpt-4o-mini",
+                "model": "mistral-small-latest",
                 "maxRetries": 1,
                 "timeout": 120,
             },
