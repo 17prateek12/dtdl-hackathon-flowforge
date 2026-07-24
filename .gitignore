@@ -18,8 +18,10 @@ frontend/out/
 .next/
 out/
 
-# production
-build/
+# production build outputs (keep backend/build + frontend/build script folders)
+/build/
+frontend/out/
+out/
 
 # misc
 .DS_Store
