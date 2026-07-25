@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.models import ConsoleEvent, RunRecord
 from app.paths import RUNS_DIR, run_path
+from app.store.mysql_db import sync_run_to_mysql
 
 _memory: dict[str, RunRecord] = {}
 
@@ -19,7 +20,12 @@ def save_run(run: RunRecord) -> RunRecord:
     run.updatedAt = datetime.now(timezone.utc).isoformat()
     _memory[run.id] = run
     run_path(run.id).write_text(run.model_dump_json(indent=2))
+    
+    # Sync run data to MySQL
+    sync_run_to_mysql(run)
+    
     return run
+
 
 
 def load_run(run_id: str) -> Optional[RunRecord]:
@@ -28,9 +34,14 @@ def load_run(run_id: str) -> Optional[RunRecord]:
     path = run_path(run_id)
     if not path.exists():
         return None
-    run = RunRecord.model_validate(json.loads(path.read_text()))
-    _memory[run_id] = run
-    return run
+    try:
+        run = RunRecord.model_validate(json.loads(path.read_text()))
+        _memory[run_id] = run
+        return run
+    except Exception as err:
+        print(f"[RunStore] Error parsing {path}: {err}")
+        return None
+
 
 
 def list_runs() -> list[RunRecord]:

@@ -36,9 +36,9 @@ export function HumanGateModal({ gate, busy, onDecide }: Props) {
           </h2>
         </div>
         <div className="px-5 py-4">
-          {gate.kind === "criteria" ? (
+          {gate.kind === "criteria" || gate.kind === "plan" ? (
             <textarea
-              className="min-h-[180px] w-full rounded-lg border border-slate-200 p-3 font-mono text-sm"
+              className={`${gate.kind === "plan" ? "min-h-[300px]" : "min-h-[180px]"} w-full rounded-lg border border-slate-200 p-3 font-mono text-sm`}
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
@@ -84,7 +84,7 @@ export function HumanGateModal({ gate, busy, onDecide }: Props) {
           >
             {gate.kind === "extra_files" ? "Reject & replan" : "Reject"}
           </button>
-          {gate.kind === "criteria" && (
+          {(gate.kind === "criteria" || gate.kind === "plan") && (
             <button
               type="button"
               disabled={busy}

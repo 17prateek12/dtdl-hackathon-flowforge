@@ -94,16 +94,25 @@ SUCCESS_CRITERIA_PROMPT = ChatPromptTemplate.from_messages([
 
 PLANNING_PROMPT = ChatPromptTemplate.from_messages([
     ("system", "{system_instructions}\n\n"
-               "CRITICAL: You MUST respond with a valid JSON object with keys:\n"
-               "- 'steps': array of concrete step strings naming real files\n"
-               "- 'plan': markdown string describing the architectural plan, sequence of work, and risk analysis."),
-    ("user", "Objective:\n{objective}\n\n"
-             "Constraints:\n{constraints}\n\n"
-             "Success Criteria:\n{criteria_json}\n\n"
+               "CRITICAL PLANNING MANDATE:\n"
+               "You are the Planning Agent. You MUST construct a detailed, professional, step-by-step architectural implementation plan.\n"
+               "Your plan MUST be derived strictly from the Approved Success Criteria from the Success Criteria Agent.\n"
+               "If there are previous Coding Agent attempts, review what files were changed and what commands were run, and use this to refine your new plan.\n"
+               "You MUST respond with a valid JSON object containing:\n"
+               "- 'steps': Array of concrete step strings naming exact files, modules, and functions to create or edit.\n"
+               "- 'plan': A comprehensive, beautifully formatted Markdown implementation plan with sections:\n"
+               "  # Architectural Implementation Plan\n"
+               "  ## 1. Context & Objective Summary\n"
+               "  ## 2. Success Criteria Mapping (showing how every success criterion is addressed)\n"
+               "  ## 3. Step-by-Step Execution Sequence (naming exact files, functions, and logic)\n"
+               "  ## 4. Verification & Testing Strategy\n"
+               "  ## 5. Risk Assessment & Edge Cases"),
+    ("user", "Approved Success Criteria:\n{criteria_json}\n\n"
+             "Previous Coding Agent Attempts (if any):\n{coding_feedback}\n\n"
              "Previous Failure Feedback (if any):\n{feedback}\n\n"
              "Repository Structure:\n{repo_listing}\n\n"
-             "Sample File ({sample_path}):\n{sample_src}\n\n"
-             "Scope Notes:\n{scope_note}")
+             "Sample File Context ({sample_path}):\n{sample_src}\n\n"
+             "Scope & Context Notes:\n{scope_note}")
 ])
 
 EXECUTION_SYSTEM_PROMPT = (
@@ -205,6 +214,7 @@ def run_langchain_planning(
     constraints: str,
     criteria: list[str],
     feedback: Optional[str] = None,
+    coding_feedback: Optional[str] = None,
     instructions: Optional[str] = None,
     model: Optional[str] = None,
     repo_listing: str = "",
@@ -226,9 +236,8 @@ def run_langchain_planning(
 
     response = chain.invoke({
         "system_instructions": sys_inst,
-        "objective": objective,
-        "constraints": constraints,
         "criteria_json": json.dumps(criteria),
+        "coding_feedback": coding_feedback or "None",
         "feedback": feedback or "None",
         "repo_listing": repo_listing,
         "sample_path": sample_path,
@@ -270,7 +279,13 @@ def run_langchain_execution(
     # Bind OpenAI tools to the LangChain model
     model_with_tools = chat_model.bind(tools=tools_defs)
 
-    sys_inst = instructions or "Implement the planned changes in the codebase using tools."
+    base_instructions = instructions or "Implement the planned changes in the codebase using tools."
+    sys_inst = (
+        f"{base_instructions}\n\n"
+        "IMPORTANT: You MUST write or update a test file (e.g., matching 'test_*.py' or '*.test.js') "
+        "to check the functionality of the new/updated/deleted code changes. The test file "
+        "must be runnable by the validation agent (e.g. via pytest or npm test)."
+    )
     system_text = EXECUTION_SYSTEM_PROMPT.format(
         system_instructions=sys_inst,
         scope_note=scope_note,
@@ -348,7 +363,11 @@ def run_langchain_validation(
     default_system = (
         "Summarize validation evidence clearly for the user. Never override or alter the pass/fail verdict."
     )
-    sys_inst = instructions or default_system
+    base_instructions = instructions or default_system
+    sys_inst = (
+        f"{base_instructions}\n"
+        "Ensure the test files written by the execution agent are run and their output is captured."
+    )
 
     response = chain.invoke({
         "system_instructions": sys_inst,

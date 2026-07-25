@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
+from pydantic import BaseModel
+
 from app.models import HumanGateDecision, StartRunBody, Workflow
 from app.orchestrator.loop import resume_run, start_run, stop_run
 from app.agents.llm import list_models
@@ -12,7 +14,14 @@ from app.store.workflow_store import (
     export_workflow_yaml,
     load_workflow,
     save_workflow,
+    rename_workflow,
+    delete_workflow,
 )
+from app.store.mysql_db import list_workflows_from_mysql
+
+class RenameWorkflowBody(BaseModel):
+    name: str
+
 
 app = FastAPI(
     title="LoopForge API",
@@ -72,6 +81,23 @@ def get_workflow(
 @app.post("/api/workflows")
 def post_workflow(body: Workflow) -> Workflow:
     return save_workflow(body)
+
+
+@app.get("/api/workflows/list")
+def list_workflows():
+    return list_workflows_from_mysql()
+
+
+@app.put("/api/workflows/{workflow_id}/rename")
+def api_rename_workflow(workflow_id: str, body: RenameWorkflowBody):
+    rename_workflow(workflow_id, body.name)
+    return {"status": "ok", "id": workflow_id, "name": body.name}
+
+
+@app.delete("/api/workflows/{workflow_id}")
+def api_delete_workflow(workflow_id: str):
+    delete_workflow(workflow_id)
+    return {"status": "ok", "id": workflow_id}
 
 
 @app.get("/api/runs")

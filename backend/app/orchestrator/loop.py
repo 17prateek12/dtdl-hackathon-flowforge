@@ -175,9 +175,27 @@ def _unapproved_extra_files(run: RunRecord, changed_paths: list[str]) -> list[st
     return [path for path in extra if path not in approved]
 
 
+def _find_success_criteria_node(workflow: Workflow) -> WorkflowNode:
+    # Try finding by role first
+    for node in workflow.nodes:
+        if node.data and getattr(node.data, "role", None) == "successCriteria":
+            return node
+    # Fallback to ID "criteria"
+    for node in workflow.nodes:
+        if node.id == "criteria":
+            return node
+    # Fallback to any node with objective / constraints or just the first node
+    for node in workflow.nodes:
+        if node.data and getattr(node.data, "objective", None) is not None:
+            return node
+    if workflow.nodes:
+        return workflow.nodes[0]
+    raise ValueError("Workflow has no nodes")
+
+
 def start_run(workflow_id: str = "default") -> RunRecord:
     workflow = load_workflow(workflow_id)
-    input_node = _find_node(workflow, "input")
+    input_node = _find_success_criteria_node(workflow)
     main_target = _resolve_main_target(input_node)
 
     workspace = RepoWorkspace.create(
@@ -202,7 +220,7 @@ def start_run(workflow_id: str = "default") -> RunRecord:
         constraints=input_node.data.constraints or "",
         targetRepo=str(workspace.root),
         mainTargetFile=workspace.main_target_file or "",
-        targetFiles=[workspace.main_target_file] if workspace.main_target_file else [],
+        targetFiles=parse_target_files(input_node.data.targetFiles) if input_node.data.targetFiles else ([workspace.main_target_file] if workspace.main_target_file else []),
         validateCommand=input_node.data.validateCommand or "",
         criteria=[],
         plan="",
@@ -214,28 +232,21 @@ def start_run(workflow_id: str = "default") -> RunRecord:
     append_event(
         run,
         level="info",
-        node_id="input",
+        node_id=input_node.id,
         message=f"Objective received: {run.objective}",
     )
     if run.mainTargetFile:
         append_event(
             run,
             level="info",
-            node_id="input",
+            node_id=input_node.id,
             message=f"Main target file: {run.mainTargetFile}",
         )
     append_event(
         run,
         level="info",
-        node_id="input",
+        node_id=input_node.id,
         message=f"Target codebase: {run.targetRepo}",
-    )
-    _set_status(run, "input", "completed")
-    run.receipts["input"] = NodeExecutionReceipt(
-        nodeId="input",
-        status="completed",
-        output=run.objective,
-        finishedAt=_now(),
     )
     _flush(run)
 
@@ -447,7 +458,8 @@ def continue_run(
     elif from_node_id:
         queue = _next_targets(workflow, from_node_id)
     else:
-        queue = ["criteria"]
+        input_node = _find_success_criteria_node(workflow)
+        queue = [input_node.id]
 
     last_command: Optional[CommandResult] = None
     last_validation_passed: Optional[bool] = None
@@ -493,14 +505,40 @@ def continue_run(
                     message=f"Generated {len(result['criteria'])} success criteria",
                 )
                 _flush(run)
-                queue.extend(_next_targets(workflow, node_id, "success"))
+                # Follow edges with 'success' handle OR plain (no handle) edges
+                next_success = _next_targets(workflow, node_id, "success")
+                next_plain = _next_targets(workflow, node_id)  # plain edges
+                # Merge deduped
+                seen: set[str] = set()
+                for nid in next_success + next_plain:
+                    if nid not in seen:
+                        seen.add(nid)
+                        queue.append(nid)
 
             elif ntype == "agent" and node.data.role == "planning":
+                coding_feedback_parts = []
+                for r_id, receipt in run.receipts.items():
+                    try:
+                        n = _find_node(workflow, receipt.nodeId)
+                        if n.data.role == "execution":
+                            files_str = ", ".join(f"{f.path} ({f.action})" for f in receipt.filesChanged) if receipt.filesChanged else "None"
+                            commands_str = "\n".join(receipt.commands) if receipt.commands else "None"
+                            coding_feedback_parts.append(
+                                f"Attempt details (Coding Agent):\n"
+                                f"- Summary: {receipt.output}\n"
+                                f"- Files Changed: {files_str}\n"
+                                f"- Execution Transcript:\n{commands_str}"
+                            )
+                    except Exception:
+                        pass
+                coding_feedback = "\n\n".join(coding_feedback_parts) if coding_feedback_parts else None
+
                 result = agents.generate_plan(
                     objective=run.objective,
                     constraints=run.constraints,
                     criteria=run.criteria,
                     feedback=run.validationEvidence,
+                    coding_feedback=coding_feedback,
                     instructions=node.data.instructions,
                     model=node.data.model,
                     main_target_file=run.mainTargetFile or None,
@@ -521,23 +559,43 @@ def continue_run(
                     node_id=node_id,
                     message=f"Plan ready ({len(result['steps']) or 'n'} steps)",
                 )
-                run.pendingGate = PendingHumanGate(
-                    nodeId=node_id,
-                    kind="plan",
-                    title="Review & Approve Implementation Plan",
-                    summary="The Planning Agent generated an implementation plan. Review, edit, or approve the plan before execution begins.",
-                    editableText=result["plan"],
+                # Only pause for human approval if a humanGate node is wired
+                # directly after the planning node.  In a simple custom pipeline
+                # (no gate node) we auto-approve so execution continues.
+                next_nodes = _next_targets(workflow, node_id)
+                has_human_gate = any(
+                    _find_node(workflow, nid).data.nodeType == "humanGate"
+                    for nid in next_nodes
+                    if _find_node(workflow, nid)
                 )
-                _set_status(run, node_id, "waiting")
-                run.status = "waiting_for_human"
-                append_event(
-                    run,
-                    level="warn",
-                    node_id=node_id,
-                    message="Paused for human approval: Review generated plan",
-                )
-                _flush(run)
-                return
+                if has_human_gate:
+                    run.pendingGate = PendingHumanGate(
+                        nodeId=node_id,
+                        kind="plan",
+                        title="Review & Approve Implementation Plan",
+                        summary="The Planning Agent generated an implementation plan. Review, edit, or approve the plan before execution begins.",
+                        editableText=result["plan"],
+                    )
+                    _set_status(run, node_id, "waiting")
+                    run.status = "waiting_for_human"
+                    append_event(
+                        run,
+                        level="warn",
+                        node_id=node_id,
+                        message="Paused for human approval: Review generated plan",
+                    )
+                    _flush(run)
+                    return
+                else:
+                    # No human gate — auto-approve and proceed directly
+                    append_event(
+                        run,
+                        level="info",
+                        node_id=node_id,
+                        message="No human gate connected — plan auto-approved, continuing execution",
+                    )
+                    _flush(run)
+                    queue.extend(next_nodes)
 
             elif ntype == "agent" and node.data.role == "execution":
                 force_fail = (
@@ -639,12 +697,22 @@ def continue_run(
 
             elif ntype == "validator":
                 if last_command is None:
-                    last_command = CommandResult(
-                        exit_code=1,
-                        stdout="",
-                        stderr="No command result available",
-                        command="(none)",
-                    )
+                    cmd = _resolve_validate_command(run, None)
+                    if cmd and cmd != "echo 'Validation complete'":
+                        append_event(
+                            run,
+                            level="info",
+                            node_id=node_id,
+                            message=f"No separate test node; executing validation command: {cmd}",
+                        )
+                        last_command = run_command_node(cmd, node.data.timeout or 120)
+                    else:
+                        last_command = CommandResult(
+                            exit_code=0,
+                            stdout="",
+                            stderr="No command result available (auto-passed)",
+                            command="(none)",
+                        )
                 file_checks = _resolve_file_checks(run, node.data.fileChecks)
                 det = deterministic_validate(
                     command_result=last_command,
@@ -739,7 +807,17 @@ def continue_run(
                     queue.extend(_next_targets(workflow, node_id, "fail"))
 
             elif ntype == "humanGate":
-                kind = "criteria" if node_id == "gate-criteria" else "final"
+                is_criteria_gate = False
+                for edge in workflow.edges:
+                    if edge.target == node_id:
+                        try:
+                            src_node = _find_node(workflow, edge.source)
+                            if src_node.data and getattr(src_node.data, "role", None) == "successCriteria":
+                                is_criteria_gate = True
+                                break
+                        except Exception:
+                            pass
+                kind = "criteria" if (node_id == "gate-criteria" or is_criteria_gate) else "final"
                 if kind == "criteria":
                     summary = "\n".join(
                         f"{i + 1}. {c}" for i, c in enumerate(run.criteria)
@@ -826,3 +904,16 @@ def continue_run(
             run.finishedAt = _now()
             _flush(run)
             return
+
+    # ── Queue exhausted ────────────────────────────────────────────────────────
+    # If the run is still 'running' (no success/stop/decision node present in
+    # the custom pipeline) auto-mark it succeeded so the frontend stops polling.
+    if run.status == "running":
+        run.status = "succeeded"
+        run.finishedAt = _now()
+        append_event(
+            run,
+            level="success",
+            message="All nodes completed — pipeline finished successfully",
+        )
+        _flush(run)

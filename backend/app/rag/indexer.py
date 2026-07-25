@@ -111,6 +111,17 @@ class QdrantRAGManager:
                 ),
             )
 
+    def clear_collection(self) -> None:
+        """Clears/deletes all vectors from Qdrant DB collection before starting a fresh index."""
+        try:
+            collections = [c.name for c in self.client.get_collections().collections]
+            if COLLECTION_NAME in collections:
+                self.client.delete_collection(collection_name=COLLECTION_NAME)
+                print(f"[RAG Manager] Emptied Qdrant DB collection '{COLLECTION_NAME}'.")
+        except Exception as err:
+            print(f"[RAG Manager] Collection clear warning: {err}")
+        self._ensure_collection()
+
     def index_directory(
         self,
         repo_path: str,
@@ -121,7 +132,11 @@ class QdrantRAGManager:
         """Reads target files, splits them into language chunks, embeds, and stores in Qdrant using parallel workers."""
         from app.paths import ROOT
 
+        # 1. Empty the Qdrant database collection first
+        self.clear_collection()
+
         p = Path(repo_path)
+
         base_dir = p.resolve()
         if not base_dir.exists() or not base_dir.is_dir():
             cand1 = (ROOT / p.name).resolve()
@@ -150,22 +165,23 @@ class QdrantRAGManager:
                     if matched:
                         files_to_process.append(matched[0])
         else:
-            for p in base_dir.rglob("*"):
-                if p.is_file() and p.suffix.lower() in valid_exts:
+            for item in base_dir.rglob("*"):
+                if item.is_file() and item.suffix.lower() in valid_exts:
                     if not any(
                         part.startswith(".") or part in ("node_modules", ".venv", "__pycache__", "dist", "build")
-                        for part in p.parts
+                        for part in item.parts
                     ):
-                        files_to_process.append(p)
+                        files_to_process.append(item)
 
         # Fallback if no files were found in base_dir
         if not files_to_process and base_dir != ROOT:
             demo_fallback = (ROOT / "demo-repo").resolve()
             if demo_fallback.exists():
-                for p in demo_fallback.rglob("*"):
-                    if p.is_file() and p.suffix.lower() in valid_exts:
-                        files_to_process.append(p)
+                for item in demo_fallback.rglob("*"):
+                    if item.is_file() and item.suffix.lower() in valid_exts:
+                        files_to_process.append(item)
                 base_dir = demo_fallback
+
 
         # Execute parallel worker pool for fast indexing across CPU cores
         max_workers = min(os.cpu_count() or 4, 8)

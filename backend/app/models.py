@@ -167,3 +167,21 @@ class RAGSearchRequest(BaseModel):
     limit: int = 5
     targetFiles: Optional[list[str]] = None
 
+
+class AgentRunData(BaseModel):
+    node_id: str
+    label: str
+    role: Optional[str] = None
+    model: Optional[str] = None
+    status: str
+    receipt: Optional[NodeExecutionReceipt] = None
+
+
+class MySQLRunData(BaseModel):
+    run_id: str
+    pipeline: Workflow
+    agents: list[AgentRunData]
+    verdict: str
+    evidence: Optional[str] = None
+
+

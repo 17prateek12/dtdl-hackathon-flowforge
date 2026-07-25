@@ -145,6 +145,7 @@ def generate_plan(
     constraints: str,
     criteria: list[str],
     feedback: Optional[str] = None,
+    coding_feedback: Optional[str] = None,
     instructions: Optional[str] = None,
     model: Optional[str] = None,
     main_target_file: Optional[str] = None,
@@ -158,20 +159,42 @@ def generate_plan(
         sample_src = "(file not readable)"
 
     if use_mock():
+        crit_lines = "\n".join(f"  - {c}" for c in criteria) if criteria else "  - Fulfill primary objective and pass all validation checks."
+        target_str = main_target_file or "codebase"
         steps = [
-            f"Analyze codebase and inspect files for objective: {objective[:120]}",
-            f"Apply changes adhering to constraints: {constraints[:120]}" if constraints else "Implement required logic",
-            "Verify all changes against success criteria and execute validation checks",
+            f"Inspect repository structure in {target_repo or '.'} and analyze target file ({target_str})",
+            "Implement solution logic for each approved success criterion",
+            "Verify implementation against all approved success criteria",
         ]
         if feedback:
-            steps.insert(0, f"Address previous failure feedback: {feedback[:200]}")
-        plan = "\n".join(
-            [
-                f"Implementation plan for objective: {objective}",
-                f"- Repository listing: {listing}",
-                *[f"{i + 1}. {s}" for i, s in enumerate(steps)],
-            ]
-        )
+            steps.insert(0, f"Address failure feedback: {feedback[:200]}")
+        if coding_feedback:
+            steps.insert(0, f"Address coding agent feedback: {coding_feedback[:200]}")
+            
+        plan_blocks = [
+            f"# Architectural Implementation Plan",
+            f"**Target Workspace**: `{target_repo or '.'}`",
+            f"**Target Files**: `{target_str}`",
+            "",
+            "## 1. Approved Success Criteria",
+            crit_lines,
+            "",
+        ]
+        if coding_feedback:
+            plan_blocks.extend([
+                "## Previous Coding Agent Attempts",
+                coding_feedback,
+                "",
+            ])
+        plan_blocks.extend([
+            "## 2. Step-by-Step Execution Sequence",
+            "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps)),
+            "",
+            "## 3. Verification & Testing Strategy",
+            "- Execute automated test commands to confirm expected outcomes.",
+            "- Validate that all modified files adhere to project specifications.",
+        ])
+        plan = "\n".join(plan_blocks)
         return {"plan": plan, "steps": steps, "raw": plan}
 
     return langchain_agents.run_langchain_planning(
@@ -179,6 +202,7 @@ def generate_plan(
         constraints=constraints,
         criteria=criteria,
         feedback=feedback,
+        coding_feedback=coding_feedback,
         instructions=instructions,
         model=model,
         repo_listing=listing,

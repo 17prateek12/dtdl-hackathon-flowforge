@@ -1,8 +1,9 @@
 "use client";
 
 const LIBRARY = [
-  { type: "input", label: "Input", hint: "Objective & constraints" },
-  { type: "agent", label: "Agent", hint: "Criteria / plan / execute" },
+  { type: "agent", role: "successCriteria", label: "Success Criteria Agent", hint: "Generate success criteria" },
+  { type: "agent", role: "planning", label: "Planning Agent", hint: "Create implementation plan" },
+  { type: "agent", role: "execution", label: "Execution Agent", hint: "Implement codebase changes" },
   { type: "command", label: "Command", hint: "Build, test, shell" },
   { type: "validator", label: "Validator", hint: "Deterministic checks" },
   { type: "decision", label: "Decision", hint: "Pass / fail routing" },
@@ -18,11 +19,11 @@ interface Props {
 export function NodeLibrary({ onLoadTemplate }: Props) {
   const handleDragStart = (e: React.DragEvent, item: typeof LIBRARY[0]) => {
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/json", JSON.stringify({ type: item.type }));
+    e.dataTransfer.setData("application/json", JSON.stringify({ type: item.type, role: item.role }));
   };
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
+    <aside className="flex w-60 shrink-0 flex-col border-l border-slate-200 bg-slate-50">
       <div className="border-b border-slate-200 px-3 py-2.5">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Node Library
@@ -34,7 +35,7 @@ export function NodeLibrary({ onLoadTemplate }: Props) {
       <div className="flex-1 space-y-1 overflow-auto p-2">
         {LIBRARY.map((item) => (
           <div
-            key={item.type}
+            key={item.role ? `${item.type}-${item.role}` : item.type}
             draggable
             onDragStart={(e) => handleDragStart(e, item)}
             className="cursor-move rounded-lg border border-slate-200 bg-white px-2.5 py-2 hover:bg-slate-100 active:opacity-75"

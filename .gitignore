@@ -46,7 +46,16 @@ yarn-error.log*
 frontend/next-env.d.ts
 
 # local runtime / persistence
-data/runs/*.json
+data/*
+!data/workflows/
+!data/workflows/.gitkeep
+!data/runs/
+!data/runs/.gitkeep
+backend/data/
+*.sqlite
+*.sqlite3
+*.db
+
 
 # python backend
 backend/.venv/

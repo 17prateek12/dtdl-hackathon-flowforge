@@ -1,5 +1,4 @@
 export type NodeType =
-  | "input"
   | "agent"
   | "command"
   | "validator"
@@ -106,7 +105,7 @@ export interface NodeExecutionReceipt {
 
 export interface PendingHumanGate {
   nodeId: string;
-  kind: "criteria" | "final" | "extra_files";
+  kind: "criteria" | "final" | "extra_files" | "plan";
   title: string;
   summary: string;
   editableText?: string;

@@ -65,12 +65,26 @@ def node_planning(state: LoopState) -> Dict[str, Any]:
     attempt = state.get("attempt", 1)
     logs.append(f"[LangGraph:Node] Executing Planning Agent (Attempt {attempt})")
 
+    # Extract execution/coding agent feedback from state
+    coding_feedback_parts = []
+    files_changed = state.get("files_changed")
+    if files_changed:
+        files_str = ", ".join(f"{f.get('path')} ({f.get('action')})" for f in files_changed if f)
+        coding_feedback_parts.append(f"Files Changed by Coding Agent: {files_str}")
+    
+    exec_logs = [line for line in state.get("logs", []) if "[LangGraph:Exec]" in line]
+    if exec_logs:
+        coding_feedback_parts.append("Coding Agent Execution Transcript:\n" + "\n".join(exec_logs))
+        
+    coding_feedback = "\n\n".join(coding_feedback_parts) if coding_feedback_parts else None
+
     inst = (state.get("instructions") or {}).get("planning")
     res = agent_runner.generate_plan(
         objective=state.get("objective", ""),
         constraints=state.get("constraints", ""),
         criteria=state.get("criteria", []),
         feedback=state.get("feedback"),
+        coding_feedback=coding_feedback,
         instructions=inst,
         model=state.get("model"),
     )

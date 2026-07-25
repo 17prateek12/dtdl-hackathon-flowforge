@@ -8,32 +8,22 @@ import yaml
 from app.models import Workflow
 from app.paths import WORKFLOWS_DIR, workflow_path
 
+try:
+    from app.store.mysql_db import (
+        save_workflow_to_mysql as _mysql_save_workflow,
+        rename_workflow_in_mysql as _mysql_rename_workflow,
+        delete_workflow_from_mysql as _mysql_delete_workflow,
+    )
+except Exception:
+    _mysql_save_workflow = None  # type: ignore[assignment]
+    _mysql_rename_workflow = None  # type: ignore[assignment]
+    _mysql_delete_workflow = None  # type: ignore[assignment]
+
 DEFAULT_WORKFLOW: dict = {
     "id": "default",
     "name": "New Workflow",
     "maxAttempts": 3,
     "nodes": [
-        {
-            "id": "input",
-            "type": "loopNode",
-            "position": {"x": 40, "y": 180},
-            "data": {
-                "label": "Coding Objective",
-                "description": "Objective and constraints",
-                "nodeType": "input",
-                "objective": (
-                    'Add a GET /health endpoint that returns JSON { status: "healthy" } '
-                    "with HTTP 200, and ensure unit tests pass."
-                ),
-                "constraints": (
-                    "Focus changes on the main target file. Other files may be "
-                    "changed if needed, but will require human approval."
-                ),
-                "targetRepo": "demo-repo",
-                "mainTargetFile": "src/app.js",
-                "validateCommand": "npm test",
-            },
-        },
         {
             "id": "criteria",
             "type": "loopNode",
@@ -51,6 +41,17 @@ DEFAULT_WORKFLOW: dict = {
                 "tools": ["Repo Reader", "Search"],
                 "maxRetries": 2,
                 "timeout": 300,
+                "objective": (
+                    'Add a GET /health endpoint that returns JSON { status: "healthy" } '
+                    "with HTTP 200, and ensure unit tests pass."
+                ),
+                "constraints": (
+                    "Focus changes on the main target file. Other files may be "
+                    "changed if needed, but will require human approval."
+                ),
+                "targetRepo": "demo-repo",
+                "mainTargetFile": "src/app.js",
+                "validateCommand": "npm test",
             },
         },
         {
@@ -85,7 +86,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "gate-plan",
             "type": "loopNode",
-            "position": {"x": 410, "y": 280},
+            "position": {"x": 540, "y": 280},
             "data": {
                 "label": "Human Gate (Review Plan)",
                 "description": "Review and approve implementation plan",
@@ -95,7 +96,7 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "execution",
             "type": "loopNode",
-            "position": {"x": 540, "y": 280},
+            "position": {"x": 800, "y": 280},
             "data": {
                 "label": "Execution Agent",
                 "description": "Implement changes in the codebase",
@@ -103,24 +104,15 @@ DEFAULT_WORKFLOW: dict = {
                 "role": "execution",
                 "instructions": (
                     "Implement the planned changes in the repository. Follow coding "
-                    "standards and existing patterns. Prefer minimal diffs."
+                    "standards and existing patterns. Prefer minimal diffs. IMPORTANT: "
+                    "You MUST write or update a test file (e.g., matching 'test_*.py' or "
+                    "'*.test.js') to check the functionality of the new/updated/deleted code changes. "
+                    "The test file must be runnable by the validation agent (e.g. via pytest or npm test)."
                 ),
                 "model": "mistral-small-latest",
                 "tools": ["File Editor", "Search", "Git", "Terminal"],
                 "maxRetries": 2,
                 "timeout": 300,
-            },
-        },
-        {
-            "id": "command",
-            "type": "loopNode",
-            "position": {"x": 800, "y": 280},
-            "data": {
-                "label": "Run Tests",
-                "description": "npm test",
-                "nodeType": "command",
-                "command": "npm test",
-                "timeout": 120,
             },
         },
         {
@@ -133,8 +125,9 @@ DEFAULT_WORKFLOW: dict = {
                 "nodeType": "validator",
                 "role": "validation",
                 "instructions": (
-                    "Summarize validation evidence. Do not override deterministic "
-                    "check results."
+                    "Summarize validation evidence. Ensure the test files written by the "
+                    "execution agent are run and their output is captured. Do not override "
+                    "deterministic check results."
                 ),
                 "fileChecks": [],
                 "model": "mistral-small-latest",
@@ -150,16 +143,6 @@ DEFAULT_WORKFLOW: dict = {
                 "label": "Decision",
                 "description": "Pass / Fail?",
                 "nodeType": "decision",
-            },
-        },
-        {
-            "id": "gate-final",
-            "type": "loopNode",
-            "position": {"x": 1320, "y": 80},
-            "data": {
-                "label": "Human Gate (Approve)",
-                "description": "Approve completion",
-                "nodeType": "humanGate",
             },
         },
         {
@@ -184,7 +167,6 @@ DEFAULT_WORKFLOW: dict = {
         },
     ],
     "edges": [
-        {"id": "e-input-criteria", "source": "input", "target": "criteria"},
         {
             "id": "e-criteria-gate",
             "source": "criteria",
@@ -212,8 +194,7 @@ DEFAULT_WORKFLOW: dict = {
             "target": "execution",
             "sourceHandle": "approve",
         },
-        {"id": "e-exec-cmd", "source": "execution", "target": "command"},
-        {"id": "e-cmd-val", "source": "command", "target": "validation"},
+        {"id": "e-exec-val", "source": "execution", "target": "validation"},
         {"id": "e-val-decision", "source": "validation", "target": "decision"},
         {
             "id": "e-decision-fail",
@@ -227,25 +208,10 @@ DEFAULT_WORKFLOW: dict = {
         {
             "id": "e-decision-pass",
             "source": "decision",
-            "target": "gate-final",
+            "target": "success",
             "sourceHandle": "pass",
             "label": "pass",
             "style": {"stroke": "#22c55e", "strokeDasharray": "6 4"},
-        },
-        {
-            "id": "e-final-success",
-            "source": "gate-final",
-            "target": "success",
-            "sourceHandle": "approve",
-            "style": {"stroke": "#22c55e"},
-        },
-        {
-            "id": "e-final-stop",
-            "source": "gate-final",
-            "target": "stop",
-            "sourceHandle": "reject",
-            "label": "reject",
-            "style": {"stroke": "#ef4444", "strokeDasharray": "6 4"},
         },
     ],
 }
@@ -282,10 +248,48 @@ def save_workflow(workflow: Workflow) -> Workflow:
     _ensure_dirs()
     path = workflow_path(workflow.id)
     path.write_text(workflow.model_dump_json(indent=2))
+    if _mysql_save_workflow:
+        try:
+            _mysql_save_workflow(workflow)
+        except Exception as err:
+            print(f"[WorkflowStore] MySQL sync failed (non-fatal): {err}")
     return workflow
 
 
+def rename_workflow(workflow_id: str, new_name: str) -> None:
+    _ensure_dirs()
+    path = workflow_path(workflow_id)
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+            data["name"] = new_name
+            path.write_text(json.dumps(data, indent=2))
+        except Exception as err:
+            print(f"[WorkflowStore] Error updating file {path}: {err}")
+    if _mysql_rename_workflow:
+        try:
+            _mysql_rename_workflow(workflow_id, new_name)
+        except Exception as err:
+            print(f"[WorkflowStore] MySQL rename failed: {err}")
+
+
+def delete_workflow(workflow_id: str) -> None:
+    _ensure_dirs()
+    path = workflow_path(workflow_id)
+    if path.exists():
+        try:
+            path.unlink()
+        except Exception as err:
+            print(f"[WorkflowStore] Error removing file {path}: {err}")
+    if _mysql_delete_workflow:
+        try:
+            _mysql_delete_workflow(workflow_id)
+        except Exception as err:
+            print(f"[WorkflowStore] MySQL delete failed: {err}")
+
+
 def export_workflow_yaml(workflow_id: str = "default") -> str:
+
     workflow = load_workflow(workflow_id)
     return yaml.safe_dump(
         workflow.model_dump(mode="json"),

@@ -75,6 +75,19 @@ if [[ -f "${ROOT_DIR}/.env" ]]; then
   set +a
 fi
 
+# ── Ensure MySQL Docker Container is Running ──────────────────────────────────
+log "Checking Docker MySQL container status..."
+if ! docker ps -a --format '{{.Names}}' | grep -Eq "^flowforge-mysql$"; then
+  log "Starting flowforge-mysql container from Docker Hub..."
+  docker run -d --name flowforge-mysql -p 3306:3306 -e MYSQL_DATABASE=flowforge -e MYSQL_ROOT_PASSWORD=root mysql:8.0
+elif ! docker ps --format '{{.Names}}' | grep -Eq "^flowforge-mysql$"; then
+  log "Starting existing stopped flowforge-mysql container..."
+  docker start flowforge-mysql
+else
+  log "MySQL container (flowforge-mysql) is already running."
+fi
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  STEP 1 — Build Backend
 # ═════════════════════════════════════════════════════════════════════════════
