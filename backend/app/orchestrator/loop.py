@@ -563,7 +563,7 @@ def continue_run(
                     node_id=node_id,
                     message="--- Architecture & Design Overview ---",
                 )
-                for line in result["plan"].split("\n"):
+                for line in str(result["plan"] or "").split("\n"):
                     trimmed = line.strip()
                     if trimmed:
                         append_event(

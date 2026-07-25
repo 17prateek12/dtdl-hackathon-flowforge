@@ -42,13 +42,13 @@
         "description": "Generate measurable success criteria",
         "nodeType": "agent",
         "role": "successCriteria",
-        "instructions": "Give the student portal app where they can see marks",
-        "model": "gpt-4o-mini",
+        "instructions": "Convert the engineering objective into measurable success criteria. Ensure the criteria are specific, verifiable and prioritized.",
+        "model": "mistral-small-latest",
         "tools": [
           "Repo Reader",
           "Search"
         ],
-        "maxRetries": 2,
+        "maxRetries": 3,
         "timeout": 300,
         "command": null,
         "fileChecks": null,
@@ -57,7 +57,8 @@
         "targetRepo": null,
         "mainTargetFile": null,
         "targetFiles": null,
-        "validateCommand": null
+        "validateCommand": null,
+        "temperature": 0.2
       }
     },
     {
@@ -100,12 +101,12 @@
         "nodeType": "agent",
         "role": "planning",
         "instructions": "Create or revise a concrete implementation plan grounded in real files in the repository. Name modules, order of work, and risks.",
-        "model": "gpt-4o-mini",
+        "model": "mistral-small-latest",
         "tools": [
           "Repo Reader",
           "Search"
         ],
-        "maxRetries": 2,
+        "maxRetries": 3,
         "timeout": 300,
         "command": null,
         "fileChecks": null,
@@ -114,7 +115,8 @@
         "targetRepo": null,
         "mainTargetFile": null,
         "targetFiles": null,
-        "validateCommand": null
+        "validateCommand": null,
+        "temperature": 0.2
       }
     },
     {
@@ -130,14 +132,14 @@
         "nodeType": "agent",
         "role": "execution",
         "instructions": "Implement the planned changes in the repository. Follow coding standards and existing patterns. Prefer minimal diffs.",
-        "model": "gpt-4o-mini",
+        "model": "mistral-small-latest",
         "tools": [
           "File Editor",
           "Search",
           "Git",
           "Terminal"
         ],
-        "maxRetries": 2,
+        "maxRetries": 3,
         "timeout": 300,
         "command": null,
         "fileChecks": null,
@@ -146,7 +148,8 @@
         "targetRepo": null,
         "mainTargetFile": null,
         "targetFiles": null,
-        "validateCommand": null
+        "validateCommand": null,
+        "temperature": 0.2
       }
     },
     {
@@ -189,9 +192,9 @@
         "nodeType": "validator",
         "role": "validation",
         "instructions": "Summarize validation evidence. Do not override deterministic check results.",
-        "model": "gpt-4o-mini",
+        "model": "mistral-small-latest",
         "tools": null,
-        "maxRetries": 1,
+        "maxRetries": 3,
         "timeout": 120,
         "command": null,
         "fileChecks": [
@@ -454,7 +457,7 @@
       "target": "planning",
       "sourceHandle": "fail",
       "targetHandle": null,
-      "label": "fail â†’ retry",
+      "label": "fail \u00e2\u2020\u2019 retry",
       "style": {
         "stroke": "#ef4444",
         "strokeDasharray": "6 4"

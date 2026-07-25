@@ -232,7 +232,7 @@ export function NodeInspector({
                 <input
                   type="number"
                   className={inputClassName}
-                  value={d.maxRetries ?? 2}
+                  value={d.maxRetries ?? 3}
                   onChange={(e) =>
                     onChange(node.id, { maxRetries: Number(e.target.value) })
                   }

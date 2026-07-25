@@ -339,9 +339,15 @@ def generate_plan(
     )
     parsed = json.loads(text or "{}")
     steps = parsed.get("steps") or []
+    if not isinstance(steps, list):
+        steps = [str(steps)]
     plan = parsed.get("plan") or "\n".join(
         f"{i + 1}. {s}" for i, s in enumerate(steps)
     )
+    if isinstance(plan, dict):
+        plan = json.dumps(plan, indent=2)
+    elif not isinstance(plan, str):
+        plan = str(plan)
     return {
         "plan": plan,
         "steps": steps,
@@ -420,12 +426,12 @@ def execute_changes(
             return json.dumps(repo_tools.run_shell(args["command"]))
         return f"Unknown tool {name}"
 
+    scope = _scope_note(main_target_file, target_repo)
     system_prompt = "Implement the planned changes using tools."
     if instructions:
         system_prompt += f"\n\nAdditional instructions from user:\n{instructions}"
     system_prompt += f" {scope} Stop when the plan is implemented."
 
-    scope = _scope_note(main_target_file, target_repo)
     transcript, _ = chat_with_tools(
         model=model,
         system=system_prompt,

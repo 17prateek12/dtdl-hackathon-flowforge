@@ -29,7 +29,8 @@ def read_file(rel_path: str) -> str:
 
 def write_file(rel_path: str, content: str) -> FileChange:
     ws = get_workspace()
-    full = ws.resolve(rel_path)
+    rel = ws.to_rel(rel_path)
+    full = ws.resolve(rel)
     action: str = "created"
     before = ""
     if full.exists():
@@ -41,7 +42,7 @@ def write_file(rel_path: str, content: str) -> FileChange:
     before_lines = len(before.splitlines()) if before else 0
     after_lines = len(content.splitlines())
     return FileChange(
-        path=normalize_rel_path(rel_path),
+        path=rel,
         action=action,  # type: ignore[arg-type]
         linesAdded=max(0, after_lines - before_lines),
         linesRemoved=max(0, before_lines - after_lines),
