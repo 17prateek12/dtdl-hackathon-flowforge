@@ -22,6 +22,7 @@ from app.orchestrator.validation import (
     CommandResult,
     deterministic_validate,
     format_validation_report,
+    resolve_smart_validation,
     run_command_node,
 )
 from app.store.run_store import append_event, load_run, save_run
@@ -681,10 +682,20 @@ def continue_run(
                 queue.extend(_next_targets(workflow, node_id))
 
             elif ntype == "command":
-                cmd = (
-                    run.validateCommand
-                    or node.data.command
-                    or "npm test"
+                smart = resolve_smart_validation(
+                    validate_command=run.validateCommand or node.data.command,
+                    objective=run.objective,
+                    main_target_file=run.mainTargetFile or None,
+                    files_changed=run.filesChanged,
+                    file_checks=None,
+                    criteria=run.criteria,
+                )
+                cmd = smart.command
+                append_event(
+                    run,
+                    level="info",
+                    node_id=node_id,
+                    message=f"Smart validate: {smart.rationale}",
                 )
                 last_command = run_command_node(cmd, node.data.timeout or 120)
                 run.receipts[node_id] = NodeExecutionReceipt(
@@ -711,16 +722,20 @@ def continue_run(
                 queue.extend(_next_targets(workflow, node_id))
 
             elif ntype == "validator":
+                smart = resolve_smart_validation(
+                    validate_command=run.validateCommand or node.data.command,
+                    objective=run.objective,
+                    main_target_file=run.mainTargetFile or None,
+                    files_changed=run.filesChanged,
+                    file_checks=node.data.fileChecks,
+                    criteria=run.criteria,
+                )
                 test_result = agents.generate_validation_tests(
                     objective=run.objective,
                     criteria=run.criteria,
                     plan=run.plan,
                     files_changed=run.filesChanged,
-                    validate_command=(
-                        run.validateCommand
-                        or node.data.command
-                        or "npm test"
-                    ),
+                    validate_command=smart.command,
                     instructions=node.data.instructions,
                     model=node.data.model,
                     main_target_file=run.mainTargetFile or None,
@@ -751,18 +766,21 @@ def continue_run(
                     node_id=node_id,
                     message=test_result.get("summary", "Tests prepared"),
                 )
+                append_event(
+                    run,
+                    level="info",
+                    node_id=node_id,
+                    message=f"Smart validate: {smart.rationale}",
+                )
 
-                if last_command is None:
-                    cmd = (
-                        run.validateCommand
-                        or node.data.command
-                        or "npm test"
+                if last_command is None or last_command.command != smart.command:
+                    last_command = run_command_node(
+                        smart.command, node.data.timeout or 120
                     )
-                    last_command = run_command_node(cmd, node.data.timeout or 120)
 
                 det = deterministic_validate(
                     command_result=last_command,
-                    file_checks=node.data.fileChecks
+                    file_checks=smart.file_checks
                     or ([run.mainTargetFile] if run.mainTargetFile else None),
                 )
                 last_validation_passed = det["passed"]
@@ -778,6 +796,7 @@ def continue_run(
                     validation=det,
                     summary=summary,
                     files_changed=run.filesChanged,
+                    smart_plan=smart,
                 )
                 run.validationEvidence = report
                 run.receipts[node_id] = NodeExecutionReceipt(

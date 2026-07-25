@@ -17,7 +17,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Database } from "lucide-react";
 import { HumanGateModal } from "@/components/HumanGateModal";
+import { RAGCodebaseModal } from "@/components/RAGCodebaseModal";
 import {
   LoopNode,
   type LoopFlowNode,
@@ -352,6 +354,7 @@ function WorkbenchInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<any[]>([]);
+  const [isRagModalOpen, setIsRagModalOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -872,6 +875,14 @@ function WorkbenchInner() {
           </button>
           <button
             type="button"
+            onClick={() => setIsRagModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-100"
+          >
+            <Database className="h-4 w-4 text-indigo-600" />
+            Import Codebase
+          </button>
+          <button
+            type="button"
             onClick={exportYaml}
             className="rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-slate-50"
           >
@@ -983,6 +994,25 @@ function WorkbenchInner() {
         gate={run?.pendingGate ?? null}
         busy={busy}
         onDecide={(p) => void onGateDecide(p)}
+      />
+
+      <RAGCodebaseModal
+        isOpen={isRagModalOpen}
+        onClose={() => setIsRagModalOpen(false)}
+        targetRepo={
+          (workflow?.nodes?.find((n) => n.id === "input")?.data as { targetRepo?: string } | undefined)
+            ?.targetRepo || "./demo-repo"
+        }
+        targetFiles={
+          (workflow?.nodes?.find((n) => n.id === "input")?.data as { targetFiles?: string[] } | undefined)
+            ?.targetFiles || []
+        }
+        onSelectTargetRepo={(repo) => {
+          onNodeChange("input", { targetRepo: repo });
+        }}
+        onSelectTargetFiles={(files) => {
+          onNodeChange("input", { targetFiles: files });
+        }}
       />
     </div>
   );

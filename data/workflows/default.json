@@ -457,7 +457,7 @@
       "target": "planning",
       "sourceHandle": "fail",
       "targetHandle": null,
-      "label": "fail \u00e2\u2020\u2019 retry",
+      "label": "fail \u2192 retry",
       "style": {
         "stroke": "#ef4444",
         "strokeDasharray": "6 4"
